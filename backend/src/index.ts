@@ -19,7 +19,8 @@ const port = Number(process.env.PORT) || 4000;
 
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://localhost:3001"],
+    // the website may be opened as localhost or 127.0.0.1 — both are this computer
+    origin: ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   })
 );
