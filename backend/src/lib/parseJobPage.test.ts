@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findDeadlineInText, normalizeLocation, parseDate, parseJobPage } from "./parseJobPage";
+import { findDeadlineInText, findSalaryInText, normalizeLocation, parseDate, parseJobPage } from "./parseJobPage";
 
 describe("parseDate", () => {
   it.each([
@@ -38,6 +38,74 @@ describe("findDeadlineInText", () => {
     expect(findDeadlineInText("আবেদনের শেষ তারিখ: ১৫/১২/২০২৬")).toBe("2026-12-15");
   });
 });
+
+describe("British-style and yearless dates", () => {
+  const today = new Date("2026-11-17T12:00:00");
+
+  it.each([
+    ["30th of November, 2026", "2026-11-30"],
+    ["30-Nov-2026", "2026-11-30"],
+    ["30-Nov-26", "2026-11-30"],
+    ["30 Nov. 2026", "2026-11-30"],
+    ["Monday, 30th November 2026", "2026-11-30"],
+    ["Nov. 30th, 2026", "2026-11-30"],
+    ["1st December 2026", "2026-12-01"],
+  ])("reads %s", (input, expected) => {
+    expect(parseDate(input)).toBe(expected);
+  });
+
+  it("doesn't treat ordinary words as months", () => {
+    expect(parseDate("Join the 30 and 2026 club")).toBeUndefined();
+  });
+
+  it("guesses the year when the deadline has none", () => {
+    expect(findDeadlineInText("Deadline: 30th November", today)).toBe("2026-11-30");
+    expect(findDeadlineInText("Apply before 15 January", today)).toBe("2027-01-15"); // next January
+    expect(findDeadlineInText("Applications close on December 5th.", today)).toBe("2026-12-05");
+  });
+
+  it.each([
+    ["Last date to apply: 30/11/2026", "2026-11-30"],
+    ["Applications close on 30 November 2026", "2026-11-30"],
+    ["Please submit your CV by 30th November, 2026", "2026-11-30"],
+    ["Valid till 30-Nov-2026", "2026-11-30"],
+  ])("finds the deadline in %s", (input, expected) => {
+    expect(findDeadlineInText(input, today)).toBe(expected);
+  });
+});
+
+describe("findSalaryInText", () => {
+  it("reads the trainee post you tested (word 'compensation')", () => {
+    const text =
+      "During the 4-month training period, trainees will receive a competitive monthly compensation ranging from BDT 35,000 to 45,000 * Upon successful completion of the program, trainees will earn a valuable certification * Subsidized daily lunch * Annual company tour * Successful trainees will be offered permanent roles as Associate Software Engineers, with a salary package between BDT 40,000 and 60,000";
+    expect(findSalaryInText(text)).toEqual({ min: 35000, max: 45000 });
+  });
+
+  it.each([
+    ["Salary: Tk. 30,000 - 40,000 per month", { min: 30000, max: 40000 }],
+    ["Salary: 35k-50k", { min: 35000, max: 50000 }],
+    ["Monthly stipend: BDT 15,000", { min: 15000, max: 15000 }],
+    ["Pay Scale: Tk. 22,000-53,060 (Grade-9)", { min: 22000, max: 53060 }],
+    ["Salary: BDT 6,00,000 per year", { min: 50000, max: 50000 }],
+    ["Salary: 1.2 lakh", { min: 120000, max: 120000 }],
+    ["বেতন: ২৫,০০০ - ৩০,০০০ টাকা", { min: 25000, max: 30000 }],
+    ["Salary: BDT 30,000 (age limit 18-30)", { min: 30000, max: 30000 }],
+  ])("reads %s", (input, expected) => {
+    expect(findSalaryInText(banglaToAsciiForTest(input))).toEqual(expected);
+  });
+
+  it.each(["Salary: Negotiable. Experience 2-3 years", "Application fee: Tk. 300", "Payment within 30 days"])(
+    "finds nothing in %s",
+    (input) => {
+      expect(findSalaryInText(input)).toBeUndefined();
+    }
+  );
+});
+
+// the real parser converts Bangla digits before searching; do the same in the test
+function banglaToAsciiForTest(text: string) {
+  return text.replace(/[০-৯]/g, (d) => String(d.charCodeAt(0) - 0x09e6));
+}
 
 describe("normalizeLocation", () => {
   it("maps old and Bangla spellings", () => {

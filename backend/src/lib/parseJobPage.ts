@@ -56,47 +56,156 @@ function toIsoDate(year: number, month: number, day: number): string | undefined
   return date.toISOString().slice(0, 10);
 }
 
-const MONTH_WORD = "([A-Za-z]{3,9}|জানুয়ারি|ফেব্রুয়ারি|মার্চ|এপ্রিল|মে|জুন|জুলাই|আগস্ট|সেপ্টেম্বর|অক্টোবর|নভেম্বর|ডিসেম্বর)";
+// Only real month names (so words like "the" or "and" are never read as a month).
+const MONTH_WORD =
+  "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|জানুয়ারি|ফেব্রুয়ারি|মার্চ|এপ্রিল|মে|জুন|জুলাই|আগস্ট|সেপ্টেম্বর|অক্টোবর|নভেম্বর|ডিসেম্বর)(?![a-z])\\.?";
+const ORDINAL = "(?:st|nd|rd|th)?";
+// A 4-digit year, or a 2-digit year only right after "-" or "/" (as in 30-Nov-26),
+// so "30 November 26 posts" is not read as a year.
+const YEAR = "(\\d{4}|(?<=[-/])\\d{2})(?!\\d)";
+
+// 30 November 2026 · 30th of November, 2026 · 30-Nov-2026 · 30 Nov. 26 · ৩০ নভেম্বর ২০২৬
+const DAY_MONTH_YEAR = new RegExp(`(?<!\\d)(\\d{1,2})${ORDINAL}(?:\\s+of)?[\\s\\-/]+${MONTH_WORD},?[\\s\\-/]+${YEAR}`, "i");
+// November 30, 2026 · Nov. 30th 2026
+const MONTH_DAY_YEAR = new RegExp(`${MONTH_WORD}\\s*(\\d{1,2})${ORDINAL}(?!\\d),?\\s+${YEAR}`, "i");
+// No year: 30 November · 30th of Nov · November 30th
+const DAY_MONTH = new RegExp(`(?<!\\d)(\\d{1,2})${ORDINAL}(?:\\s+of)?[\\s\\-/]+${MONTH_WORD}(?![\\s,\\-/]*\\d)`, "i");
+const MONTH_DAY = new RegExp(`${MONTH_WORD}\\s*(\\d{1,2})${ORDINAL}(?![\\d,]*\\s*\\d{2,4})(?!\\d)`, "i");
+
+// When a deadline has no year, it's almost always the next time that date comes around.
+function inferYear(month: number, day: number, today: Date): string | undefined {
+  const thisYear = toIsoDate(today.getFullYear(), month, day);
+  if (!thisYear) return undefined;
+  const sixtyDaysAgo = new Date(today.getTime() - 60 * 86_400_000).toISOString().slice(0, 10);
+  return thisYear >= sixtyDaysAgo ? thisYear : toIsoDate(today.getFullYear() + 1, month, day);
+}
+
+type ParseDateOptions = { allowNoYear?: boolean; today?: Date };
 
 // Find the first date in a piece of text. Bangladesh writes numbers day-first (30/11/2026).
-export function parseDate(input: string): string | undefined {
+export function parseDate(input: string, options: ParseDateOptions = {}): string | undefined {
   const text = banglaDigitsToAscii(input);
   let m: RegExpMatchArray | null;
 
-  // 2026-11-30
   // 2026-11-30 (also "2026-11-30T23:59:59" from structured data)
   if ((m = text.match(/(?<!\d)(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/))) return toIsoDate(+m[1], +m[2], +m[3]);
 
   // 30/11/2026, 30-11-2026, 30.11.2026
   if ((m = text.match(/(?<!\d)(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})(?!\d)/))) return toIsoDate(+m[3], +m[2], +m[1]);
 
-  // 30 November 2026, 30th Nov, 2026, ৩০ নভেম্বর ২০২৬
-  m = text.match(new RegExp(`(?<!\\d)(\\d{1,2})(?:st|nd|rd|th)?\\s+${MONTH_WORD},?\\s+(\\d{4})`, "i"));
-  if (m) {
+  if ((m = text.match(DAY_MONTH_YEAR))) {
     const month = monthNumber(m[2]);
     if (month) return toIsoDate(+m[3], month, +m[1]);
   }
-
-  // November 30, 2026
-  m = text.match(new RegExp(`${MONTH_WORD}\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})`, "i"));
-  if (m) {
+  if ((m = text.match(MONTH_DAY_YEAR))) {
     const month = monthNumber(m[1]);
     if (month) return toIsoDate(+m[3], month, +m[2]);
+  }
+
+  if (options.allowNoYear) {
+    const today = options.today ?? new Date();
+    if ((m = text.match(DAY_MONTH))) {
+      const month = monthNumber(m[2]);
+      if (month) return inferYear(month, +m[1], today);
+    }
+    if ((m = text.match(MONTH_DAY))) {
+      const month = monthNumber(m[1]);
+      if (month) return inferYear(month, +m[2], today);
+    }
   }
 
   return undefined;
 }
 
 // Words that usually come right before the application deadline.
-const DEADLINE_LABELS =
-  /(application\s+deadline|deadline|last\s+date(?:\s+of\s+(?:application|submission))?|apply\s+(?:before|by)|closing\s+date|আবেদনের\s+শেষ\s+তারিখ|শেষ\s+তারিখ)/gi;
+const DEADLINE_LABELS = new RegExp(
+  [
+    "application\\s+deadline",
+    "deadline(?:\\s+(?:to|for)\\s+(?:apply|application|submission))?",
+    "last\\s+(?:date|day)(?:\\s+(?:of|for|to)\\s+(?:application|submission|apply))?",
+    "apply\\s+(?:before|by|within|on\\s+or\\s+before)",
+    "(?:submit|send)[^.]{0,40}?\\s+(?:before|by)",
+    "applications?\\s+(?:close|closes|closing|will\\s+close)(?:\\s+on)?",
+    "closing\\s+date",
+    "valid\\s+(?:till|until|through)",
+    "আবেদনের\\s+শেষ\\s+তারিখ",
+    "শেষ\\s+তারিখ",
+  ].join("|"),
+  "gi"
+);
 
-export function findDeadlineInText(text: string): string | undefined {
+export function findDeadlineInText(text: string, today?: Date): string | undefined {
   for (const match of text.matchAll(DEADLINE_LABELS)) {
     // look at the ~80 characters after the label
     const after = text.slice(match.index! + match[0].length, match.index! + match[0].length + 80);
-    const date = parseDate(after);
+    const date = parseDate(after, { allowNoYear: true, today });
     if (date) return date;
+  }
+  return undefined;
+}
+
+// ---------- salary ----------
+
+// Words that come before a salary. "compensation" and "stipend" are common for trainee posts,
+// "pay scale" for government jobs.
+const SALARY_LABELS =
+  /\b(?:salary|salaries|compensation|remuneration|stipend|allowance|wages?|pay(?:\s+scale)?|gross)\b|বেতন|সম্মানী|ভাতা/gi;
+
+const CURRENCY = "(?:bdt|tk\\.?|taka|৳|টাকা)";
+// 35,000 · 1,20,000 (lakh style) · 35000 · 35k · 1.5 lakh
+const AMOUNT = "(\\d{1,3}(?:,\\d{2,3})+|\\d+(?:\\.\\d+)?)\\s*(k|lakhs?|lacs?)?(?![\\d%])";
+const SALARY_RANGE = new RegExp(
+  `(?:${CURRENCY}\\s*)?${AMOUNT}\\s*(?:${CURRENCY}\\s*)?(?:to|-|–|—|and|থেকে)\\s*(?:${CURRENCY}\\s*)?${AMOUNT}`,
+  "i"
+);
+// A single amount needs something showing it's money: a currency ("BDT 30,000") or a unit ("1.2 lakh", "40k").
+const SALARY_SINGLE = new RegExp(
+  `${CURRENCY}\\s*${AMOUNT}|${AMOUNT}\\s*${CURRENCY}|(\\d+(?:\\.\\d+)?)\\s*(k|lakhs?|lacs?)(?![a-z\\d])`,
+  "i"
+);
+const PER_YEAR = /^[\s)/.]*(?:per\s+(?:year|annum)|\/\s*(?:year|yr)|yearly|annually|p\.?\s?a\.?(?![a-z]))/i;
+
+function toTaka(number: string, unit?: string): number {
+  const value = Number(number.replace(/,/g, ""));
+  if (!unit) return value;
+  return unit.toLowerCase().startsWith("k") ? value * 1_000 : value * 100_000; // lakh / lac
+}
+
+const isMonthlyAmount = (n: number) => Number.isFinite(n) && n >= 1_000 && n <= 2_000_000;
+
+export function findSalaryInText(text: string): { min: number; max: number } | undefined {
+  for (const label of text.matchAll(SALARY_LABELS)) {
+    const start = label.index! + label[0].length;
+    const window = text.slice(start, start + 150);
+    // "Salary: Negotiable" — don't go hunting for a number further on
+    if (/^\W{0,5}(?:negotiable|competitive|as\s+per|attractive)/i.test(window) && !/\d/.test(window.slice(0, 40))) continue;
+
+    // Try "35,000 to 45,000" first, then a single "BDT 30,000". Take the first one that looks like a real salary
+    // (so an age range like "18-30" next to the salary doesn't fool us).
+    const candidates: { min: number; max: number; end: number }[] = [];
+    const range = window.match(SALARY_RANGE);
+    if (range) {
+      candidates.push({
+        min: toTaka(range[1], range[2]),
+        max: toTaka(range[3], range[4]),
+        end: range.index! + range[0].length,
+      });
+    }
+    const single = window.match(SALARY_SINGLE);
+    if (single) {
+      const amount = toTaka(single[1] ?? single[3] ?? single[5], single[2] ?? single[4] ?? single[6]);
+      candidates.push({ min: amount, max: amount, end: single.index! + single[0].length });
+    }
+
+    for (let { min, max, end } of candidates) {
+      // "BDT 6,00,000 per year" -> per month
+      if (PER_YEAR.test(window.slice(end, end + 20))) {
+        min = Math.round(min / 12);
+        max = Math.round(max / 12);
+      }
+      if (min > max) [min, max] = [max, min];
+      if (isMonthlyAmount(min) && isMonthlyAmount(max)) return { min, max };
+    }
   }
   return undefined;
 }
@@ -269,6 +378,13 @@ export function parseJobPage(html: string, pageUrl: string): ExtractedJob {
   const bodyText = banglaDigitsToAscii($("body").text().replace(/\s+/g, " "));
 
   if (!result.deadline) result.deadline = field(findDeadlineInText(bodyText), "text");
+  if (!result.salaryMin && !result.salaryMax) {
+    const salary = findSalaryInText(bodyText);
+    if (salary) {
+      result.salaryMin = field(salary.min, "text");
+      result.salaryMax = field(salary.max, "text");
+    }
+  }
   if (!result.location) result.location = field(normalizeLocation(bodyText.slice(0, 4000)), "text");
   if (!result.jobType) {
     const head = bodyText.slice(0, 4000);
