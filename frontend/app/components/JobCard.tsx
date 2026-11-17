@@ -50,6 +50,16 @@ export default function JobCard({ job }: JobCardProps) {
         {job.location} · {job.jobType} · {job.category}
       </p>
       <p className="text-sm">Salary: {formatSalary(job.salaryMin, job.salaryMax)}</p>
+      {job.applyUrl ? (
+        <a
+          href={job.applyUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block mt-2 text-sm underline"
+        >
+          Apply / view original ↗
+        </a>
+      ) : null}
       {job.isDemo ? <p className="text-xs mt-2 text-amber-700">Demo listing</p> : null}
     </div>
   );

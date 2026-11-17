@@ -1,10 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import JobCard from "./components/JobCard";
+import { API_URL } from "./lib/api";
 import { Job } from "./types/job";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export default function Home() {
   const [search, setSearch] = useState("");
@@ -76,8 +76,15 @@ export default function Home() {
 
   return (
     <main className="max-w-3xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-1">JobPulse</h1>
-      <p className="mb-6">Demo data from the API. These are not real vacancies.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold mb-1">JobPulse</h1>
+          <p className="text-sm">Jobs marked &quot;Demo listing&quot; are sample data, not real vacancies.</p>
+        </div>
+        <Link href="/import" className="rounded-md bg-blue-600 text-white px-4 py-2">
+          + Add job from link
+        </Link>
+      </div>
 
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:flex-wrap">
         <input

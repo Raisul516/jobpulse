@@ -4,6 +4,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -12,6 +13,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type { ExtractedJob } from "../types/extracted";
 
 // ---------- Enums (fixed lists of allowed values) ----------
 
@@ -37,6 +39,13 @@ export const sourceKindEnum = pgEnum("source_kind", [
   "government",
   "company",
   "portal",
+]);
+
+// A collected listing is a DRAFT until the user reviews it.
+export const reviewStatusEnum = pgEnum("review_status", [
+  "pending", // waiting for the user to check it
+  "approved", // became (or was linked to) a job
+  "rejected", // user said it's not useful
 ]);
 
 export const applicationStatusEnum = pgEnum("application_status", [
@@ -113,6 +122,11 @@ export const jobSourceRecords = pgTable(
     rawCompany: text("raw_company"),
     rawContent: text("raw_content"), // HTML/text snapshot
     contentHash: text("content_hash"), // detect when a listing changes
+    fetchError: text("fetch_error"), // why the page couldn't be read (user can still fill the form by hand)
+    // What the parser guessed. Shown to the user as a draft; never trusted as-is.
+    extracted: jsonb("extracted").$type<ExtractedJob>(),
+    reviewStatus: reviewStatusEnum("review_status").notNull().default("pending"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

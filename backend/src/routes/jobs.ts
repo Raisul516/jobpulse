@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { findPossibleDuplicates } from "../lib/importQueries";
 import { findJobById, findJobs, findLocations } from "../lib/jobQueries";
 import { JOB_CATEGORIES, JOB_TYPES, JobCategory, JobSort, JobType, SORTS } from "../types/job";
 
@@ -50,6 +51,13 @@ jobsRouter.get("/", async (req, res) => {
 // GET /api/jobs/locations — must be above "/:id", otherwise "locations" is read as an id.
 jobsRouter.get("/locations", async (_req, res) => {
   res.json({ locations: await findLocations() });
+});
+
+// GET /api/jobs/similar?title=&company= — open jobs that might be the same vacancy.
+jobsRouter.get("/similar", async (req, res) => {
+  const title = firstString(req.query.title).trim().slice(0, 200);
+  const company = firstString(req.query.company).trim().slice(0, 200);
+  res.json({ jobs: await findPossibleDuplicates(title, company) });
 });
 
 // GET /api/jobs/:id

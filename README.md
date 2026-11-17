@@ -31,10 +31,22 @@ Personal job-intelligence and alert app for Bangladesh. See [documentation/roadm
 | `npm run db:seed` | Reset demo jobs (only rows marked `is_demo`) |
 | `npm run db:studio` | Browse the database in your browser |
 | `npm run typecheck` | Check TypeScript types |
+| `npm test` | Run unit tests (parser, URL safety) |
 
 ## API
 
 - `GET /api/health`
 - `GET /api/jobs?search=&location=&jobType=&category=&sort=` — `sort`: `newest`, `deadline`, `salary-high`, `salary-low`. Expired jobs are hidden.
 - `GET /api/jobs/locations`
+- `GET /api/jobs/similar?title=&company=` — open jobs that may be the same vacancy
 - `GET /api/jobs/:id`
+
+### Paste-a-link imports (web page: http://localhost:3000/import)
+
+- `POST /api/imports` `{ url }` — reads the page and saves a **draft** (same link twice returns the first one)
+- `GET /api/imports?status=pending|approved|rejected`
+- `GET /api/imports/:id`
+- `POST /api/imports/:id/approve` `{ job: {...} }` to create a job, or `{ linkToJobId }` if it's the same vacancy as an existing job
+- `POST /api/imports/:id/reject`
+
+Imported pages are only fetched from public addresses (private/local network addresses are refused), with a 15 s timeout and 3 MB limit. PDF links aren't parsed yet — fill those in by hand.
