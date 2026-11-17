@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import JobCard from "./components/JobCard";
 import { API_URL } from "./lib/api";
+import { saveJob, unsaveJob } from "./lib/saved";
 import { Job } from "./types/job";
 
 export default function Home() {
@@ -17,6 +17,8 @@ export default function Home() {
   const [reloadKey, setReloadKey] = useState(0);
   // The last finished request: which URL it was for, and what came back.
   const [result, setResult] = useState<{ key: string; jobs: Job[]; error: string } | null>(null);
+  const [busyJobId, setBusyJobId] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState("");
 
   // Build the request URL from the current filters (plain calculation, no state needed).
   const params = new URLSearchParams();
@@ -71,20 +73,38 @@ export default function Home() {
     return () => controller.abort();
   }, [requestUrl, requestKey]);
 
+  // Save / unsave a job, then update just that card (no need to reload the whole list).
+  async function toggleSave(job: Job) {
+    setBusyJobId(job.id);
+    setSaveError("");
+    try {
+      const nowSaved = job.savedStatus === null;
+      if (nowSaved) await saveJob(job.id);
+      else await unsaveJob(job.id);
+      setResult((old) =>
+        old && {
+          ...old,
+          jobs: old.jobs.map((j) => (j.id === job.id ? { ...j, savedStatus: nowSaved ? "saved" : null } : j)),
+        }
+      );
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Could not save the job.");
+    } finally {
+      setBusyJobId(null);
+    }
+  }
+
   const controlClass = "border rounded-md px-3 py-2 bg-white text-black";
   const showInitialLoading = loading && jobs.length === 0 && !error;
 
   return (
     <main className="max-w-3xl mx-auto p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-1">JobPulse</h1>
-          <p className="text-sm">Jobs marked &quot;Demo listing&quot; are sample data, not real vacancies.</p>
-        </div>
-        <Link href="/import" className="rounded-md bg-blue-600 text-white px-4 py-2">
-          + Add job from link
-        </Link>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-1">Open jobs</h1>
+        <p className="text-sm">Jobs marked &quot;Demo listing&quot; are sample data, not real vacancies.</p>
       </div>
+
+      {saveError ? <p className="mb-4 text-red-600">{saveError}</p> : null}
 
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:flex-wrap">
         <input
@@ -168,7 +188,9 @@ export default function Home() {
           </p>
 
           {jobs.length > 0 ? (
-            jobs.map((job) => <JobCard key={job.id} job={job} />)
+            jobs.map((job) => (
+              <JobCard key={job.id} job={job} onToggleSave={toggleSave} busy={busyJobId === job.id} />
+            ))
           ) : (
             <p>No jobs found. Try a different search or clear a filter.</p>
           )}

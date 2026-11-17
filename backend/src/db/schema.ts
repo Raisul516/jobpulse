@@ -148,6 +148,7 @@ export const savedJobs = pgTable(
       .references(() => jobs.id, { onDelete: "cascade" }),
     status: applicationStatusEnum("status").notNull().default("saved"),
     notes: text("notes"),
+    appliedAt: timestamp("applied_at", { withTimezone: true }), // set the first time status becomes "applied"
     savedAt: timestamp("saved_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

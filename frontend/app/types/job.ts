@@ -16,4 +16,5 @@ export type Job = {
   deadline: string | null; // "YYYY-MM-DD"
   status: "open" | "expired" | "closed";
   isDemo: boolean;
+  savedStatus: "saved" | "applied" | "interview" | "offer" | "rejected" | null; // null = not saved
 };

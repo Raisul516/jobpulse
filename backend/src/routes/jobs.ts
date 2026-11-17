@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { currentUserId } from "../lib/currentUser";
 import { findPossibleDuplicates } from "../lib/importQueries";
 import { findJobById, findJobs, findLocations } from "../lib/jobQueries";
 import { JOB_CATEGORIES, JOB_TYPES, JobCategory, JobSort, JobType, SORTS } from "../types/job";
@@ -37,13 +38,16 @@ jobsRouter.get("/", async (req, res) => {
     return;
   }
 
-  const jobs = await findJobs({
-    search: firstString(req.query.search),
-    location: optional(req.query.location),
-    jobType: (jobType || null) as JobType | null,
-    category: (category || null) as JobCategory | null,
-    sort: sort as JobSort,
-  });
+  const jobs = await findJobs(
+    {
+      search: firstString(req.query.search),
+      location: optional(req.query.location),
+      jobType: (jobType || null) as JobType | null,
+      category: (category || null) as JobCategory | null,
+      sort: sort as JobSort,
+    },
+    await currentUserId()
+  );
 
   res.json({ jobs, count: jobs.length });
 });
@@ -68,7 +72,7 @@ jobsRouter.get("/:id", async (req, res) => {
     return;
   }
 
-  const job = await findJobById(id);
+  const job = await findJobById(id, await currentUserId());
   if (!job) {
     res.status(404).json({ error: "Job not found" });
     return;

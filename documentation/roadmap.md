@@ -18,7 +18,7 @@ Build first, learn later: each milestone gets a short walkthrough once it works.
 ## Milestones
 1. ✅ **Database foundation** — Postgres, schema (`jobs`, `job_sources`, `job_source_records`, `users`, `profiles`, `saved_jobs`), seed demo data, API reads from the DB.
 2. ✅ **Paste-a-link ingestion** (HTML pages; PDF circulars still to do) — submit URL → fetch → store raw snapshot → extract title/company/deadline → draft for user review.
-3. **Saved jobs + application tracking + deadlines** — bookmark, status, deadline countdown.
+3. ✅ **Saved jobs + application tracking + deadlines** (reminders by push come in milestone 4) — bookmark, status, deadline countdown.
 4. **PWA + Web Push** — installable app, push subscription, "new matching job" and "deadline in 3 days" alerts.
 5. **Collectors** — Teletalk govt circulars, then company career pages; scheduled, rate-limited, raw snapshots kept.
 6. **Duplicate detection** — URL normalisation + company/title/deadline + trigram similarity; uncertain matches go to a review queue, never auto-merged.

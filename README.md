@@ -41,6 +41,14 @@ Personal job-intelligence and alert app for Bangladesh. See [documentation/roadm
 - `GET /api/jobs/similar?title=&company=` — open jobs that may be the same vacancy
 - `GET /api/jobs/:id`
 
+### Saved jobs / application tracker (web page: http://localhost:3000/saved)
+
+- `GET /api/saved` — my saved jobs, nearest deadline first
+- `PUT /api/saved/:jobId` `{ status?, notes? }` — save a job, or change its status (`saved`, `applied`, `interview`, `offer`, `rejected`) / notes
+- `DELETE /api/saved/:jobId` — remove from saved
+
+Every job in `GET /api/jobs` includes `savedStatus` (`null` = not saved). Jobs whose deadline has passed (Bangladesh time) are marked `expired` when the server starts and every hour after.
+
 ### Paste-a-link imports (web page: http://localhost:3000/import)
 
 - `POST /api/imports` `{ url }` — reads the page and saves a **draft** (same link twice returns the first one)

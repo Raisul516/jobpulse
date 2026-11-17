@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, gte, ilike, isNull, or, sql, SQL } from "drizzle-orm";
 import { db } from "../db/client";
-import { jobs } from "../db/schema";
+import { jobs, savedJobs } from "../db/schema";
 import { Job, JobCategory, JobSort, JobType } from "../types/job";
+import { todayInDhaka } from "./today";
 
 export type JobQuery = {
   search: string;
@@ -12,7 +13,7 @@ export type JobQuery = {
 };
 
 // Columns we send to the frontend (no internal timestamps).
-const jobColumns = {
+export const jobColumns = {
   id: jobs.id,
   title: jobs.title,
   company: jobs.company,
@@ -28,16 +29,22 @@ const jobColumns = {
   isDemo: jobs.isDemo,
 };
 
+// Same columns plus "have I saved this, and what's its status?" (null = not saved).
+const jobWithSavedColumns = { ...jobColumns, savedStatus: savedJobs.status };
+
+// LEFT JOIN: keep every job, and attach my saved row if there is one.
+const mySavedRow = (userId: number) => and(eq(savedJobs.jobId, jobs.id), eq(savedJobs.userId, userId));
+
 // % and _ are wildcards in LIKE; escape them so a user typing "50%" searches literally.
 function escapeLike(text: string): string {
   return text.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 }
 
-export async function findJobs(query: JobQuery): Promise<Job[]> {
+export async function findJobs(query: JobQuery, userId: number): Promise<Job[]> {
   const conditions: SQL[] = [
     eq(jobs.status, "open"),
-    // hide jobs whose deadline has already passed
-    or(isNull(jobs.deadline), gte(jobs.deadline, sql`CURRENT_DATE`))!,
+    // hide jobs whose deadline has already passed (in Bangladesh time)
+    or(isNull(jobs.deadline), gte(jobs.deadline, todayInDhaka))!,
   ];
 
   const needle = query.search.trim();
@@ -57,14 +64,20 @@ export async function findJobs(query: JobQuery): Promise<Job[]> {
   }[query.sort];
 
   return db
-    .select(jobColumns)
+    .select(jobWithSavedColumns)
     .from(jobs)
+    .leftJoin(savedJobs, mySavedRow(userId))
     .where(and(...conditions))
     .orderBy(...orderBy);
 }
 
-export async function findJobById(id: number): Promise<Job | undefined> {
-  const rows = await db.select(jobColumns).from(jobs).where(eq(jobs.id, id)).limit(1);
+export async function findJobById(id: number, userId: number): Promise<Job | undefined> {
+  const rows = await db
+    .select(jobWithSavedColumns)
+    .from(jobs)
+    .leftJoin(savedJobs, mySavedRow(userId))
+    .where(eq(jobs.id, id))
+    .limit(1);
   return rows[0];
 }
 
