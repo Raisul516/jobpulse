@@ -5,6 +5,7 @@ import { importsRouter } from "./routes/imports";
 import { jobsRouter } from "./routes/jobs";
 import { savedRouter } from "./routes/saved";
 import { sourcesRouter } from "./routes/sources";
+import { preferencesRouter } from "./routes/preferences";
 import { startCollectorTimer } from "./collectors/run";
 import { startExpiryTimer } from "./lib/expireJobs";
 
@@ -29,6 +30,7 @@ app.use("/api/jobs", jobsRouter);
 app.use("/api/imports", importsRouter);
 app.use("/api/saved", savedRouter);
 app.use("/api/sources", sourcesRouter);
+app.use("/api/preferences", preferencesRouter);
 
 // Unknown routes -> 404 JSON instead of an HTML page.
 app.use((_req, res) => {

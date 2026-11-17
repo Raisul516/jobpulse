@@ -2,6 +2,8 @@ import { Router } from "express";
 import { currentUserId } from "../lib/currentUser";
 import { findPossibleDuplicates } from "../lib/importQueries";
 import { findJobById, findJobs, findLocations } from "../lib/jobQueries";
+import { matchJob } from "../lib/matching";
+import { getPreferences } from "../lib/preferences";
 import { JOB_CATEGORIES, JOB_TYPES, JobCategory, JobSort, JobType, SORTS } from "../types/job";
 
 export const jobsRouter = Router();
@@ -19,7 +21,7 @@ function optional(value: unknown): string {
   return text === "All" ? "" : text;
 }
 
-// GET /api/jobs?search=&location=&jobType=&category=&sort=
+// GET /api/jobs?search=&location=&jobType=&category=&sort=&matchesOnly=true
 jobsRouter.get("/", async (req, res) => {
   const jobType = optional(req.query.jobType);
   const category = optional(req.query.category);
@@ -38,6 +40,7 @@ jobsRouter.get("/", async (req, res) => {
     return;
   }
 
+  const userId = await currentUserId();
   const jobs = await findJobs(
     {
       search: firstString(req.query.search),
@@ -46,10 +49,27 @@ jobsRouter.get("/", async (req, res) => {
       category: (category || null) as JobCategory | null,
       sort: sort as JobSort,
     },
-    await currentUserId()
+    userId
   );
 
-  res.json({ jobs, count: jobs.length });
+  // Add "how well does this match me?" to every job (null until preferences are set).
+  const prefs = await getPreferences(userId);
+  let result = jobs.map((job) => ({ ...job, match: prefs ? matchJob(job, prefs) : null }));
+
+  if (firstString(req.query.matchesOnly) === "true" && prefs) {
+    result = result.filter((job) => job.match?.isMatch);
+  }
+  if (sort === "best-match") {
+    // matches first, then higher score; ties keep the newest-first order from the database
+    result.sort(
+      (a, b) =>
+        Number(b.match?.isMatch ?? 0) - Number(a.match?.isMatch ?? 0) ||
+        Number(b.match?.passesFilters ?? 0) - Number(a.match?.passesFilters ?? 0) ||
+        (b.match?.score ?? 0) - (a.match?.score ?? 0)
+    );
+  }
+
+  res.json({ jobs: result, count: result.length, hasPreferences: prefs !== null });
 });
 
 // GET /api/jobs/locations — must be above "/:id", otherwise "locations" is read as an id.

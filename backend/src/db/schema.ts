@@ -159,6 +159,26 @@ export const jobSourceRecords = pgTable(
   ]
 );
 
+// ---------- What the user is looking for ----------
+
+// One row per user. Empty lists mean "any".
+export const userPreferences = pgTable("user_preferences", {
+  userId: integer("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  // Words that make a job interesting: skills or titles ("react", "software engineer", "trainee")
+  keywords: text("keywords").array().notNull().default(sql`'{}'::text[]`),
+  // Words that rule a job out when they're in the title ("senior", "sales")
+  excludeKeywords: text("exclude_keywords").array().notNull().default(sql`'{}'::text[]`),
+  categories: jobCategoryEnum("categories").array().notNull().default(sql`'{}'::job_category[]`),
+  jobTypes: jobTypeEnum("job_types").array().notNull().default(sql`'{}'::job_type[]`),
+  locations: text("locations").array().notNull().default(sql`'{}'::text[]`),
+  minSalary: integer("min_salary"), // BDT/month; jobs that don't state a salary are NOT excluded
+  matchThreshold: integer("match_threshold").notNull().default(70), // % needed to count as a match / notify
+  notifyEnabled: boolean("notify_enabled").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ---------- Saved jobs / application tracking ----------
 
 export const savedJobs = pgTable(

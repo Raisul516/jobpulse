@@ -58,6 +58,8 @@ export async function findJobs(query: JobQuery, userId: number): Promise<Job[]> 
 
   const orderBy = {
     newest: [desc(jobs.createdAt), desc(jobs.id)],
+    // best-match is sorted in the route after scoring; start from newest so ties stay newest-first
+    "best-match": [desc(jobs.createdAt), desc(jobs.id)],
     deadline: [sql`${jobs.deadline} ASC NULLS LAST`, asc(jobs.id)],
     "salary-high": [sql`${jobs.salaryMax} DESC NULLS LAST`, asc(jobs.id)],
     "salary-low": [sql`${jobs.salaryMin} ASC NULLS LAST`, asc(jobs.id)],

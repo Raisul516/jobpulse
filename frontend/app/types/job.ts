@@ -17,4 +17,13 @@ export type Job = {
   status: "open" | "expired" | "closed";
   isDemo: boolean;
   savedStatus: "saved" | "applied" | "interview" | "offer" | "rejected" | null; // null = not saved
+  match?: MatchResult | null; // null until you set your preferences
+};
+
+// How well a job fits your preferences (worked out by the backend, see backend/src/lib/matching.ts)
+export type MatchResult = {
+  score: number; // 0–100
+  passesFilters: boolean;
+  isMatch: boolean;
+  reasons: { text: string; good: boolean }[];
 };

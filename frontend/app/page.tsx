@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import JobCard from "./components/JobCard";
 import { API_URL } from "./lib/api";
@@ -12,11 +13,12 @@ export default function Home() {
   const [jobType, setJobType] = useState("All");
   const [category, setCategory] = useState("All");
   const [sort, setSort] = useState("newest");
+  const [matchesOnly, setMatchesOnly] = useState(false);
   const [locations, setLocations] = useState<string[]>([]);
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   // The last finished request: which URL it was for, and what came back.
-  const [result, setResult] = useState<{ key: string; jobs: Job[]; error: string } | null>(null);
+  const [result, setResult] = useState<{ key: string; jobs: Job[]; error: string; hasPreferences: boolean } | null>(null);
   const [busyJobId, setBusyJobId] = useState<number | null>(null);
   const [saveError, setSaveError] = useState("");
 
@@ -27,6 +29,7 @@ export default function Home() {
   if (jobType !== "All") params.set("jobType", jobType);
   if (category !== "All") params.set("category", category);
   if (sort !== "newest") params.set("sort", sort);
+  if (matchesOnly) params.set("matchesOnly", "true");
   const requestUrl = `${API_URL}/api/jobs?${params.toString()}`;
   const requestKey = `${requestUrl}#${reloadKey}`; // reloadKey forces a retry with the same URL
 
@@ -34,6 +37,8 @@ export default function Home() {
   const loading = result?.key !== requestKey;
   const jobs = result?.jobs ?? [];
   const error = loading ? "" : result.error;
+  // Keep the last known answer while a new request loads, so the hint doesn't flicker.
+  const hasPreferences = result?.hasPreferences ?? true;
 
   // Load the location list once, from the jobs that actually exist.
   useEffect(() => {
@@ -56,15 +61,16 @@ export default function Home() {
         if (!response.ok) {
           throw new Error(`Request failed (${response.status})`);
         }
-        return response.json() as Promise<{ jobs: Job[]; count: number }>;
+        return response.json() as Promise<{ jobs: Job[]; count: number; hasPreferences: boolean }>;
       })
       .then((body) => {
-        setResult({ key: requestKey, jobs: body.jobs, error: "" });
+        setResult({ key: requestKey, jobs: body.jobs, error: "", hasPreferences: body.hasPreferences });
       })
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setResult({
           key: requestKey,
+          hasPreferences: true,
           jobs: [],
           error: "Could not load jobs. Start the backend with npm run dev in the backend folder.",
         });
@@ -159,11 +165,31 @@ export default function Home() {
           className={controlClass}
         >
           <option value="newest">Newest first</option>
+          <option value="best-match">Best match first</option>
           <option value="deadline">Deadline: soonest</option>
           <option value="salary-high">Salary: high to low</option>
           <option value="salary-low">Salary: low to high</option>
         </select>
+
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={matchesOnly}
+            disabled={!hasPreferences}
+            onChange={(e) => setMatchesOnly(e.target.checked)}
+          />
+          Only my matches
+        </label>
       </div>
+
+      {!hasPreferences ? (
+        <p className="mb-4 rounded-md bg-blue-100 text-blue-900 p-3 text-sm">
+          Tell JobPulse what you&apos;re looking for to see a match score on every job.{" "}
+          <Link href="/preferences" className="underline font-medium">
+            Set your preferences →
+          </Link>
+        </p>
+      ) : null}
 
       {error ? (
         <div className="mb-4">

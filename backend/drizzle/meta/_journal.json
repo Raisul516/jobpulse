@@ -36,6 +36,13 @@
       "when": 1794928377003,
       "tag": "0004_collectors",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794929362415,
+      "tag": "0005_user_preferences",
+      "breakpoints": true
     }
   ]
 }

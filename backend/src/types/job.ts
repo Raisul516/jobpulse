@@ -7,7 +7,7 @@ export type JobType = (typeof JOB_TYPES)[number];
 export const JOB_CATEGORIES = jobCategoryEnum.enumValues;
 export type JobCategory = (typeof JOB_CATEGORIES)[number];
 
-export const SORTS = ["newest", "deadline", "salary-high", "salary-low"] as const;
+export const SORTS = ["newest", "best-match", "deadline", "salary-high", "salary-low"] as const;
 export type JobSort = (typeof SORTS)[number];
 
 // The shape the API sends to the frontend.

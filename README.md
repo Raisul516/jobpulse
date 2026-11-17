@@ -41,6 +41,12 @@ Personal job-intelligence and alert app for Bangladesh. See [documentation/roadm
 - `GET /api/jobs/similar?title=&company=` — open jobs that may be the same vacancy
 - `GET /api/jobs/:id`
 
+### Preferences and matching (web page: http://localhost:3000/preferences)
+
+- `GET /api/preferences` / `PUT /api/preferences` — keywords, excluded title words, categories, job types, locations, minimum salary, match threshold (default 70%), notifications on/off
+- Every job in `GET /api/jobs` gets `match: { score, passesFilters, isMatch, reasons }` once preferences are set. Add `matchesOnly=true` and/or `sort=best-match`.
+- **Filters are separate from the score**: a job that fails a filter is never a match, whatever its score. Keyword in the title = 70%, each extra title keyword +15, each description-only keyword +5 (see `backend/src/lib/matching.ts`).
+
 ### Automatic sources (web page: http://localhost:3000/sources)
 
 JobPulse checks company career pages on **SmartRecruiters, Greenhouse and Lever** through their public job APIs — 10 seconds after the backend starts, then every 3 hours (`COLLECT_INTERVAL_HOURS` to change, `COLLECT_DISABLED=1` to turn off).
