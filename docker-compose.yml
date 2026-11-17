@@ -1,0 +1,18 @@
+# Local development database for JobPulse.
+# The image includes pgvector so semantic search can be added later.
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "5433:5432" # 5433 on your PC so it doesn't clash with your local PostgreSQL on 5432
+    volumes:
+      - jobpulse-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  jobpulse-db:
