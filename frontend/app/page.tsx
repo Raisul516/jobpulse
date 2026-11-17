@@ -184,9 +184,12 @@ export default function Home() {
 
       {!hasPreferences ? (
         <p className="mb-4 rounded-md bg-blue-100 text-blue-900 p-3 text-sm">
-          Tell JobPulse what you&apos;re looking for to see a match score on every job.{" "}
+          Upload your CV or tell JobPulse what you&apos;re looking for to see a match score on every job.{" "}
+          <Link href="/profile" className="underline font-medium">
+            Upload CV →
+          </Link>{" "}
           <Link href="/preferences" className="underline font-medium">
-            Set your preferences →
+            Set preferences →
           </Link>
         </p>
       ) : null}

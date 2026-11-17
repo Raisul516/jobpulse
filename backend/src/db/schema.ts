@@ -8,12 +8,17 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  real,
   serial,
   text,
   timestamp,
   uniqueIndex,
+  vector,
 } from "drizzle-orm/pg-core";
 import type { ExtractedJob } from "../types/extracted";
+
+// Size of the embeddings made by ai-service (paraphrase-multilingual-MiniLM-L12-v2).
+export const EMBEDDING_DIMENSIONS = 384;
 
 // ---------- Enums (fixed lists of allowed values) ----------
 
@@ -85,6 +90,8 @@ export const jobs = pgTable(
     deadline: date("deadline"), // last date to apply
     status: jobStatusEnum("status").notNull().default("open"),
     isDemo: boolean("is_demo").notNull().default(false), // demo data is never mixed up with real jobs
+    // Meaning of the job as 384 numbers (from ai-service), compared with your CV. Null until computed.
+    embedding: vector("embedding", { dimensions: EMBEDDING_DIMENSIONS }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -93,6 +100,8 @@ export const jobs = pgTable(
     index("jobs_title_trgm_idx").using("gin", sql`${t.title} gin_trgm_ops`),
     index("jobs_company_trgm_idx").using("gin", sql`${t.company} gin_trgm_ops`),
     index("jobs_deadline_idx").on(t.deadline),
+    // Fast "most similar jobs" search by cosine distance
+    index("jobs_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
   ]
 );
 
@@ -158,6 +167,46 @@ export const jobSourceRecords = pgTable(
     index("source_records_job_idx").on(t.jobId),
   ]
 );
+
+// ---------- Your profile (from your CV, confirmed by you) ----------
+
+export type EducationEntry = {
+  level: "PhD" | "Masters" | "Bachelor" | "Diploma" | "HSC" | "SSC";
+  degree: string;
+  subject: string | null;
+  institution: string | null;
+  result: string | null;
+  year: number | null;
+};
+
+// Only what YOU confirmed. The raw guesses from the CV live in cv_uploads.
+export const userProfiles = pgTable("user_profiles", {
+  userId: integer("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  fullName: text("full_name"),
+  dateOfBirth: date("date_of_birth"),
+  skills: text("skills").array().notNull().default(sql`'{}'::text[]`),
+  education: jsonb("education").$type<EducationEntry[]>().notNull().default([]),
+  experienceYears: real("experience_years"),
+  summary: text("summary"),
+  embedding: vector("embedding", { dimensions: EMBEDDING_DIMENSIONS }),
+  cvUploadId: integer("cv_upload_id"), // which upload this was confirmed from
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Every CV you uploaded, with the text and what the parser guessed (a draft, not trusted).
+export const cvUploads = pgTable("cv_uploads", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  text: text("text").notNull(),
+  extracted: jsonb("extracted").$type<Record<string, { value: unknown; foundBy: string }>>().notNull(),
+  warnings: text("warnings").array().notNull().default(sql`'{}'::text[]`),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 // ---------- What the user is looking for ----------
 

@@ -9,6 +9,7 @@ import { and, eq, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { jobs, jobSourceRecords, jobSources } from "../db/schema";
 import { expireOldJobs } from "../lib/expireJobs";
+import { embedMissingJobs } from "../lib/jobEmbeddings";
 import { findPossibleDuplicates } from "../lib/importQueries";
 import { normalizeUrl } from "../lib/normalizeUrl";
 import { findDeadlineInText, findSalaryInText, normalizeLocation } from "../lib/parseJobPage";
@@ -198,6 +199,8 @@ async function syncOne(source: Source, job: CollectedJob, seenAt: Date, summary:
         .update(jobs)
         .set({
           ...(changed && missing.length === 0 && jobValues(extracted)),
+          // new text = old embedding is out of date; it will be recomputed
+          ...(changed && missing.length === 0 && { embedding: null }),
           // back on the company's site -> open again (the expiry check closes it again if the deadline passed)
           ...(reappeared && { status: sql`CASE WHEN ${jobs.status} = 'closed' THEN 'open'::job_status ELSE ${jobs.status} END` }),
           updatedAt: new Date(),
@@ -288,6 +291,7 @@ export async function runAllSources(): Promise<void> {
     const result = await runSource(source.id);
     console.log(`[collect] ${source.name}: ${result.message}`);
   }
+  void embedMissingJobs(); // embed the new jobs right away instead of waiting for the timer
 }
 
 const HOURS = Number(process.env.COLLECT_INTERVAL_HOURS) || 3;

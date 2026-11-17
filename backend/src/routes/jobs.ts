@@ -2,9 +2,22 @@ import { Router } from "express";
 import { currentUserId } from "../lib/currentUser";
 import { findPossibleDuplicates } from "../lib/importQueries";
 import { findJobById, findJobs, findLocations } from "../lib/jobQueries";
-import { matchJob } from "../lib/matching";
+import { similarities } from "../lib/jobEmbeddings";
+import { matchJob, Preferences } from "../lib/matching";
 import { getPreferences } from "../lib/preferences";
+import { getProfileForMatching } from "../lib/profile";
 import { JOB_CATEGORIES, JOB_TYPES, JobCategory, JobSort, JobType, SORTS } from "../types/job";
+
+// Used when you uploaded a CV but haven't set preferences: no filters, default threshold.
+const DEFAULT_PREFERENCES: Preferences = {
+  keywords: [],
+  excludeKeywords: [],
+  categories: [],
+  jobTypes: [],
+  locations: [],
+  minSalary: null,
+  matchThreshold: 70,
+};
 
 export const jobsRouter = Router();
 
@@ -52,9 +65,18 @@ jobsRouter.get("/", async (req, res) => {
     userId
   );
 
-  // Add "how well does this match me?" to every job (null until preferences are set).
-  const prefs = await getPreferences(userId);
-  let result = jobs.map((job) => ({ ...job, match: prefs ? matchJob(job, prefs) : null }));
+  // Add "how well does this match me?" to every job — from your preferences and/or your confirmed CV.
+  // (null when you have set neither)
+  const [savedPrefs, profile] = await Promise.all([getPreferences(userId), getProfileForMatching(userId)]);
+  const prefs = savedPrefs ?? (profile ? DEFAULT_PREFERENCES : null);
+  const similarity = profile?.embedding ? await similarities(profile.embedding, jobs.map((j) => j.id)) : new Map<number, number>();
+
+  let result = jobs.map((job) => ({
+    ...job,
+    match: prefs
+      ? matchJob(job, prefs, profile ? { skills: profile.skills, similarity: similarity.get(job.id) ?? null } : undefined)
+      : null,
+  }));
 
   if (firstString(req.query.matchesOnly) === "true" && prefs) {
     result = result.filter((job) => job.match?.isMatch);
@@ -69,7 +91,7 @@ jobsRouter.get("/", async (req, res) => {
     );
   }
 
-  res.json({ jobs: result, count: result.length, hasPreferences: prefs !== null });
+  res.json({ jobs: result, count: result.length, hasPreferences: prefs !== null, hasCvProfile: profile !== null });
 });
 
 // GET /api/jobs/locations — must be above "/:id", otherwise "locations" is read as an id.

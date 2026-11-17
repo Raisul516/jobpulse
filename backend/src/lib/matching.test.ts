@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { containsKeyword, matchJob, MatchableJob, Preferences } from "./matching";
+import { containsKeyword, matchJob, MatchableJob, Preferences, similarityToScore } from "./matching";
 
 const job: MatchableJob = {
   title: "Junior React Developer",
@@ -86,6 +86,52 @@ describe("matchJob", () => {
     const r = matchJob({ ...job, salaryMin: null, salaryMax: null }, { ...prefs, minSalary: 50000 });
     expect(r.passesFilters).toBe(true);
     expect(r.reasons[0].text).toContain("not stated");
+  });
+
+  it("CV similarity and CV skills add to the score", () => {
+    // no keywords: only the two CV parts count
+    const r = matchJob(job, prefs, { skills: ["React", "TypeScript", "Excel"], similarity: 0.5 });
+    // similarity 0.5 -> 75%; 2 skills found -> 70%; weighted (0.35*75 + 0.25*70) / 0.6 = 72.9 -> 73
+    expect(r.score).toBe(73);
+    expect(r.reasons.map((x) => x.text)).toEqual(["Similar to your CV: 75%", "Your CV skills in this job: React, TypeScript"]);
+  });
+
+  it("combines keywords with the CV parts as a weighted average", () => {
+    // keywords 70 (0.4), similarity 0.2 -> 0 (0.35), skills none -> 0 (0.25) => 28
+    const r = matchJob(job, { ...prefs, keywords: ["react"] }, { skills: ["Python"], similarity: 0.2 });
+    expect(r.score).toBe(28);
+    expect(r.isMatch).toBe(false);
+  });
+
+  it("ignores one-letter and ambiguous skills like C, R and Go", () => {
+    const r = matchJob({ ...job, description: "Go to our website. Grade C applicants welcome." }, prefs, {
+      skills: ["C", "R", "Go"],
+      similarity: null,
+    });
+    // no matchable skills and no similarity: nothing to score by
+    expect(r.score).toBe(100);
+    expect(r.reasons).toEqual([]);
+  });
+
+  it.each([
+    [0.1, 0],
+    [0.2, 0],
+    [0.4, 50],
+    [0.49, 73],
+    [0.6, 100],
+    [0.9, 100],
+  ])("similarity %f -> %i%%", (similarity, expected) => {
+    expect(similarityToScore(similarity)).toBe(expected);
+  });
+
+  it("a job without an embedding yet is scored without the similarity part", () => {
+    const r = matchJob(job, prefs, { skills: ["React"], similarity: null });
+    expect(r.score).toBe(55); // only CV skills: 1 hit -> 55
+  });
+
+  it("filters still win over a strong CV match", () => {
+    const r = matchJob(job, { ...prefs, locations: ["Sylhet"] }, { skills: ["React"], similarity: 0.9 });
+    expect(r.isMatch).toBe(false);
   });
 
   it("location filter ignores capital letters", () => {

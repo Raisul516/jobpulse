@@ -50,7 +50,13 @@ export function containsKeyword(text: string, keyword: string): boolean {
 
 const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
-export function matchJob(job: MatchableJob, prefs: Preferences): MatchResult {
+// What we know from your confirmed CV profile (both optional).
+export type CvSignals = {
+  skills: string[];
+  similarity: number | null; // cosine similarity between your profile and this job, or null if not computed yet
+};
+
+export function matchJob(job: MatchableJob, prefs: Preferences, cv?: CvSignals): MatchResult {
   const reasons: MatchResult["reasons"] = [];
   let passesFilters = true;
   const fail = (text: string) => {
@@ -82,27 +88,74 @@ export function matchJob(job: MatchableJob, prefs: Preferences): MatchResult {
   }
 
   // ---------- 2. relevance score ----------
-  let score: number;
-  if (prefs.keywords.length === 0) {
-    // No keywords: everything that passes your filters is relevant.
-    score = 100;
-  } else {
+  // Up to three parts, each 0–100, combined as a weighted average of the parts that are available.
+  const parts: { score: number; weight: number }[] = [];
+
+  // a) your keywords
+  if (prefs.keywords.length) {
     const titleHits = prefs.keywords.filter((k) => containsKeyword(job.title, k));
     const descHits = prefs.keywords.filter((k) => !titleHits.includes(k) && containsKeyword(job.description ?? "", k));
 
+    let keywordScore: number;
     if (titleHits.length) {
-      score = 70 + 15 * (titleHits.length - 1) + 5 * descHits.length;
+      keywordScore = 70 + 15 * (titleHits.length - 1) + 5 * descHits.length;
     } else if (descHits.length) {
-      score = 40 + 10 * (descHits.length - 1);
+      keywordScore = 40 + 10 * (descHits.length - 1);
     } else {
-      score = 0;
+      keywordScore = 0;
     }
-    score = Math.min(100, score);
+    parts.push({ score: Math.min(100, keywordScore), weight: WEIGHTS.keywords });
 
     if (titleHits.length) reasons.push({ text: `Title mentions ${titleHits.map((k) => `"${k}"`).join(", ")}`, good: true });
     if (descHits.length) reasons.push({ text: `Description mentions ${descHits.map((k) => `"${k}"`).join(", ")}`, good: true });
     if (!titleHits.length && !descHits.length) reasons.push({ text: "None of your keywords appear", good: false });
   }
 
+  // b) how close the job's meaning is to your CV (from the embeddings)
+  if (cv?.similarity !== undefined && cv.similarity !== null) {
+    const cvScore = similarityToScore(cv.similarity);
+    parts.push({ score: cvScore, weight: WEIGHTS.cvSimilarity });
+    reasons.push({ text: `Similar to your CV: ${cvScore}%`, good: cvScore >= 50 });
+  }
+
+  // c) skills from your CV that the job mentions
+  const cvSkills = (cv?.skills ?? []).filter(isMatchableSkill);
+  if (cvSkills.length) {
+    const jobText = `${job.title}\n${job.description ?? ""}`;
+    const hits = cvSkills.filter((s) => containsKeyword(jobText, s));
+    parts.push({ score: hits.length ? Math.min(100, 40 + 15 * hits.length) : 0, weight: WEIGHTS.cvSkills });
+    reasons.push(
+      hits.length
+        ? { text: `Your CV skills in this job: ${hits.slice(0, 6).join(", ")}${hits.length > 6 ? "…" : ""}`, good: true }
+        : { text: "None of your CV skills are mentioned", good: false }
+    );
+  }
+
+  // Nothing to score by (no keywords, no CV): everything that passes your filters counts.
+  const totalWeight = parts.reduce((sum, p) => sum + p.weight, 0);
+  const score = totalWeight ? roundHalfUp(parts.reduce((sum, p) => sum + p.score * p.weight, 0) / totalWeight) : 100;
+
   return { score, passesFilters, isMatch: passesFilters && score >= prefs.matchThreshold, reasons };
+}
+
+// Decimal maths in computers is slightly off (87.5 can come out as 87.4999…); the tiny nudge makes .5 round up as expected.
+const roundHalfUp = (n: number) => Math.round(n + 1e-9);
+
+export const WEIGHTS = { keywords: 0.4, cvSimilarity: 0.35, cvSkills: 0.25 };
+
+// Cosine similarity from the embedding model -> 0–100.
+// With this model, unrelated jobs land around 0.2–0.3. A real job page that fits well scores
+// about 0.5 (company boilerplate in the description pulls it down), a very close one 0.6+.
+// So 0.2 counts as 0% and 0.6 as 100%. A starting calibration: adjust once more real jobs are collected.
+export function similarityToScore(similarity: number): number {
+  const scaled = (similarity - 0.2) / (0.6 - 0.2);
+  return roundHalfUp(Math.max(0, Math.min(1, scaled)) * 100);
+}
+
+// One- or two-letter skill names ("C", "R") and "Go" are ordinary words or letters in job text,
+// so they would match almost everything.
+const AMBIGUOUS_SKILLS = new Set(["go"]);
+function isMatchableSkill(skill: string): boolean {
+  const s = skill.trim().toLowerCase();
+  return s.length > 1 && !AMBIGUOUS_SKILLS.has(s);
 }
