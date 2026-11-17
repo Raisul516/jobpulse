@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/", label: "Jobs" },
   { href: "/saved", label: "My applications" },
+  { href: "/sources", label: "Sources" },
   { href: "/import", label: "+ Add from link" },
 ];
 

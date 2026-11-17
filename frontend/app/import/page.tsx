@@ -105,6 +105,7 @@ export default function ImportPage() {
                   <span className="break-all">
                     {p.extracted?.title?.value ?? "Untitled"}
                     <span className="block text-xs text-gray-500">{p.sourceUrl}</span>
+                    {p.reviewReason ? <span className="block text-xs text-blue-700">{p.reviewReason}</span> : null}
                   </span>
                   <button type="button" onClick={() => openPending(p.id)} className="rounded-md border px-3 py-1">
                     Review

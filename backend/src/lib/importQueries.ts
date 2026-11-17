@@ -1,6 +1,6 @@
 // Database work for "paste a link" imports.
 import { createHash } from "node:crypto";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { jobs, jobSourceRecords, jobSources } from "../db/schema";
 import type { ExtractedJob } from "../types/extracted";
@@ -16,6 +16,7 @@ const importColumns = {
   jobId: jobSourceRecords.jobId,
   extracted: jobSourceRecords.extracted,
   fetchError: jobSourceRecords.fetchError,
+  reviewReason: jobSourceRecords.reviewReason,
   reviewStatus: jobSourceRecords.reviewStatus,
   fetchedAt: jobSourceRecords.fetchedAt,
 };
@@ -26,6 +27,7 @@ export type ImportRecord = {
   jobId: number | null;
   extracted: ExtractedJob | null;
   fetchError: string | null;
+  reviewReason: string | null; // why an automatically collected job needs a human look
   reviewStatus: "pending" | "approved" | "rejected";
   fetchedAt: Date;
 };
@@ -112,7 +114,13 @@ export async function findImports(status?: ImportRecord["reviewStatus"]): Promis
   return db
     .select(importColumns)
     .from(jobSourceRecords)
-    .where(status ? eq(jobSourceRecords.reviewStatus, status) : undefined)
+    .where(
+      and(
+        status ? eq(jobSourceRecords.reviewStatus, status) : undefined,
+        // a pending draft for a posting the company already took down is no longer worth reviewing
+        status === "pending" ? isNull(jobSourceRecords.removedAt) : undefined
+      )
+    )
     .orderBy(desc(jobSourceRecords.fetchedAt))
     .limit(100);
 }

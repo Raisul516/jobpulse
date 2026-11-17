@@ -198,6 +198,12 @@ export default function ReviewForm({ item, onDone }: Props) {
         </p>
       </div>
 
+      {item.reviewReason ? (
+        <p className="rounded-md bg-blue-100 text-blue-900 p-3 text-sm">
+          Collected automatically, but needs your check: {item.reviewReason}
+        </p>
+      ) : null}
+
       {item.fetchError ? (
         <p className="rounded-md bg-amber-100 text-amber-900 p-3 text-sm">
           Couldn&apos;t read the page: {item.fetchError} You can still fill in the details yourself.

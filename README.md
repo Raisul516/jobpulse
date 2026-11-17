@@ -41,6 +41,22 @@ Personal job-intelligence and alert app for Bangladesh. See [documentation/roadm
 - `GET /api/jobs/similar?title=&company=` — open jobs that may be the same vacancy
 - `GET /api/jobs/:id`
 
+### Automatic sources (web page: http://localhost:3000/sources)
+
+JobPulse checks company career pages on **SmartRecruiters, Greenhouse and Lever** through their public job APIs — 10 seconds after the backend starts, then every 3 hours (`COLLECT_INTERVAL_HOURS` to change, `COLLECT_DISABLED=1` to turn off).
+
+- Complete new jobs with nothing similar already saved are added automatically.
+- Jobs with missing details or that look like an existing job wait in the review list (`/import`), with the reason.
+- Changed postings are updated; postings removed from the company site close the job (unless another source still lists it).
+
+API:
+- `GET /api/sources`
+- `POST /api/sources` `{ url, category }` — paste any careers-page or job link from a supported platform
+- `POST /api/sources/:id/run` — check now
+- `PATCH /api/sources/:id` `{ enabled?, defaultCategory? }`
+
+To support another platform, add a file in `backend/src/collectors/` that implements `Collector` (see `types.ts`) and register it in `collectors/index.ts`.
+
 ### Saved jobs / application tracker (web page: http://localhost:3000/saved)
 
 - `GET /api/saved` — my saved jobs, nearest deadline first

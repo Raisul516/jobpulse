@@ -96,14 +96,32 @@ export const jobs = pgTable(
   ]
 );
 
+// How JobPulse reads a source. "manual" = links the user pastes; the others are
+// recruitment platforms with a public job API that companies use for their career pages.
+export const sourceAdapterEnum = pgEnum("source_adapter", ["manual", "smartrecruiters", "greenhouse", "lever"]);
+
 // A website or platform that jobs come from.
-export const jobSources = pgTable("job_sources", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull().unique(),
-  kind: sourceKindEnum("kind").notNull(),
-  baseUrl: text("base_url"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const jobSources = pgTable(
+  "job_sources",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull().unique(),
+    kind: sourceKindEnum("kind").notNull(),
+    adapter: sourceAdapterEnum("adapter").notNull().default("manual"),
+    // The company's ID on that platform, e.g. "NiftyCodersPvtLtd" on SmartRecruiters
+    externalKey: text("external_key"),
+    baseUrl: text("base_url"),
+    // Category for jobs from this source (a bank's career page -> "Bank")
+    defaultCategory: jobCategoryEnum("default_category"),
+    enabled: boolean("enabled").notNull().default(true),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+    lastRunOk: boolean("last_run_ok"),
+    lastRunMessage: text("last_run_message"),
+    lastFoundCount: integer("last_found_count"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("job_sources_adapter_key_uniq").on(t.adapter, t.externalKey)]
+);
 
 // The original listing as found on one source. Keeps attribution
 // and a raw snapshot so we can re-parse later.
@@ -127,6 +145,12 @@ export const jobSourceRecords = pgTable(
     extracted: jsonb("extracted").$type<ExtractedJob>(),
     reviewStatus: reviewStatusEnum("review_status").notNull().default("pending"),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    // For collected listings: the platform's own ID, when we last saw it, and when it disappeared
+    externalId: text("external_id"),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    // Why a collected listing needs the user's review instead of being added automatically
+    reviewReason: text("review_reason"),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

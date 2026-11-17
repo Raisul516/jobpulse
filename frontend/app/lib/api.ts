@@ -33,6 +33,7 @@ export type JobImport = {
   jobId: number | null;
   extracted: ExtractedJob | null;
   fetchError: string | null;
+  reviewReason: string | null; // why an automatically collected job needs your review
   reviewStatus: "pending" | "approved" | "rejected";
   fetchedAt: string;
   possibleDuplicates?: PossibleDuplicate[];
