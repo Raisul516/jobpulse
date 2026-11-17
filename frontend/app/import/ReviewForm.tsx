@@ -140,7 +140,7 @@ export default function ReviewForm({ item, onDone }: Props) {
     }
   }
 
-  const inputClass = "w-full border rounded-md px-3 py-2 bg-white text-black";
+  const inputClass = "input";
   const creatingNew = selected === "new";
 
   const textInput = (name: keyof FormValues, label: string, type = "text", required = false) => (
@@ -187,31 +187,31 @@ export default function ReviewForm({ item, onDone }: Props) {
   );
 
   return (
-    <form onSubmit={approve} className="border rounded-lg p-4 space-y-4">
+    <form onSubmit={approve} className="card p-5 space-y-4">
       <div>
         <h2 className="text-xl font-semibold">Check the details</h2>
         <p className="text-sm break-all">
           From:{" "}
-          <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="underline">
+          <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="link">
             {item.sourceUrl}
           </a>
         </p>
       </div>
 
       {item.reviewReason ? (
-        <p className="rounded-md bg-blue-100 text-blue-900 p-3 text-sm">
+        <p className="alert alert-info">
           Collected automatically, but needs your check: {item.reviewReason}
         </p>
       ) : null}
 
       {item.fetchError ? (
-        <p className="rounded-md bg-amber-100 text-amber-900 p-3 text-sm">
+        <p className="alert alert-warn">
           Couldn&apos;t read the page: {item.fetchError} You can still fill in the details yourself.
         </p>
       ) : null}
 
       {duplicates.length > 0 ? (
-        <fieldset className="rounded-md border border-amber-400 p-3 space-y-2">
+        <fieldset className="rounded-xl border border-amber-300 p-4 space-y-2 dark:border-amber-500/40">
           <legend className="px-1 font-medium">This might already be in JobPulse</legend>
           <label className="flex gap-2">
             <input type="radio" checked={selected === "new"} onChange={() => setChoice("new")} />
@@ -223,7 +223,7 @@ export default function ReviewForm({ item, onDone }: Props) {
               <span>
                 Same as <strong>{d.title}</strong> at {d.company}
                 {d.deadline ? ` (deadline ${d.deadline})` : ""}
-                <span className="block text-xs text-gray-500">{d.reason}</span>
+                <span className="block text-xs text-muted">{d.reason}</span>
               </span>
             </label>
           ))}
@@ -258,10 +258,10 @@ export default function ReviewForm({ item, onDone }: Props) {
       {error ? <p className="text-red-600">{error}</p> : null}
 
       <div className="flex flex-wrap gap-3">
-        <button type="submit" disabled={saving} className="rounded-md bg-blue-600 text-white px-4 py-2 disabled:opacity-50">
+        <button type="submit" disabled={saving} className="btn btn-primary">
           {saving ? "Saving…" : creatingNew ? "Save job" : "Link to existing job"}
         </button>
-        <button type="button" onClick={reject} disabled={saving} className="rounded-md border px-4 py-2 disabled:opacity-50">
+        <button type="button" onClick={reject} disabled={saving} className="btn btn-secondary">
           Discard
         </button>
       </div>

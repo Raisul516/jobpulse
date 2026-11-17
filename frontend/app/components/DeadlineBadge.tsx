@@ -1,4 +1,5 @@
 // Shows how many days are left to apply. Red when 3 days or fewer.
+import { CalendarClock } from "lucide-react";
 
 // Whole days from today until the deadline (0 = today, negative = passed).
 export function daysLeft(deadline: string): number {
@@ -16,7 +17,7 @@ type Props = {
 
 export default function DeadlineBadge({ deadline, muted = false }: Props) {
   if (!deadline) {
-    return <span className="text-sm text-gray-500">No deadline listed</span>;
+    return <span className="badge badge-gray">No deadline listed</span>;
   }
 
   const days = daysLeft(deadline);
@@ -25,11 +26,11 @@ export default function DeadlineBadge({ deadline, muted = false }: Props) {
   else if (days === 0) label = "Last day today";
   else label = `${days} day${days === 1 ? "" : "s"} left`;
 
-  const color =
-    muted || days < 0 ? "bg-gray-100 text-gray-600" : days <= 3 ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-700";
+  const color = muted || days < 0 ? "badge-gray" : days <= 3 ? "badge-red" : "badge-blue";
 
   return (
-    <span className={`text-sm rounded-full px-2 py-0.5 whitespace-nowrap ${color}`}>
+    <span className={`badge ${color}`} title={`Apply by ${deadline}`}>
+      <CalendarClock size={12} aria-hidden />
       {label} · {deadline}
     </span>
   );

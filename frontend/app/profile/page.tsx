@@ -192,8 +192,8 @@ export default function ProfilePage() {
     setForm((f) => f && { ...f, education: f.education.map((e, i) => (i === index ? { ...e, ...changes } : e)) });
   }
 
-  const inputClass = "w-full border rounded-md px-3 py-2 bg-white text-black";
-  const messageClass = { ok: "bg-green-100 text-green-900", warn: "bg-amber-100 text-amber-900", error: "bg-red-100 text-red-900" };
+  const inputClass = "input";
+  const messageClass = { ok: "alert-success", warn: "alert-warn", error: "alert-error" };
   const hint = (key: string) =>
     isDraft ? (
       upload?.extracted[key] ? (
@@ -204,44 +204,44 @@ export default function ProfilePage() {
     ) : null;
   const errorFor = (path: string) => fieldErrors.find((f) => f.path.startsWith(path))?.message;
 
-  if (loadError) return <main className="max-w-3xl mx-auto p-6 text-red-600">{loadError}</main>;
-  if (!form) return <main className="max-w-3xl mx-auto p-6">Loading…</main>;
+  if (loadError) return <main className="page-narrow text-red-600">{loadError}</main>;
+  if (!form) return <main className="page-narrow">Loading…</main>;
 
   return (
-    <main className="max-w-3xl mx-auto p-6 space-y-6">
+    <main className="page-narrow space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-1">My profile</h1>
-        <p className="text-sm">
+        <h1 className="page-title">My profile</h1>
+        <p className="page-sub">
           Upload your CV and JobPulse compares every job with it. Your CV is read on this computer only — it isn&apos;t
           sent to any outside service.
         </p>
       </div>
 
       {!aiServiceUp ? (
-        <p className="rounded-md bg-amber-100 text-amber-900 p-3 text-sm">
+        <p className="alert alert-warn">
           The AI service isn&apos;t running, so CVs can&apos;t be read right now. Start it (see README → ai-service) and reload
           this page.
         </p>
       ) : null}
 
-      <section className="border rounded-lg p-4 space-y-2">
+      <section className="card p-5 space-y-2">
         <h2 className="font-semibold">Upload your CV</h2>
         <p className="text-sm">PDF or Word (.docx), up to 5 MB. Scanned images can&apos;t be read yet.</p>
-        <label className={`inline-block rounded-md bg-blue-600 text-white px-4 py-2 cursor-pointer ${uploading || !aiServiceUp ? "opacity-50 pointer-events-none" : ""}`}>
+        <label className={`inline-block btn btn-primary cursor-pointer ${uploading || !aiServiceUp ? "opacity-50 pointer-events-none" : ""}`}>
           {uploading ? "Reading your CV…" : upload ? "Upload a newer CV" : "Choose CV file"}
           <input type="file" accept=".pdf,.docx" onChange={uploadCv} className="sr-only" disabled={uploading || !aiServiceUp} />
         </label>
-        {upload ? <p className="text-sm text-gray-500">Last uploaded: {upload.fileName} ({formatDate(upload.createdAt)})</p> : null}
+        {upload ? <p className="text-sm text-muted">Last uploaded: {upload.fileName} ({formatDate(upload.createdAt)})</p> : null}
       </section>
 
-      {message ? <p className={`rounded-md p-3 ${messageClass[message.kind]}`}>{message.text}</p> : null}
+      {message ? <p className={`alert ${messageClass[message.kind]}`}>{message.text}</p> : null}
 
       {isDraft ? (
-        <p className="rounded-md bg-blue-100 text-blue-900 p-3 text-sm">
+        <p className="alert alert-info">
           This is a <strong>draft</strong> read from your CV. It isn&apos;t used for matching until you confirm it.
         </p>
       ) : profile ? (
-        <p className="text-sm text-green-600">✓ Confirmed {formatDate(profile.confirmedAt)}{profile.hasEmbedding ? "" : " (CV similarity not computed yet)"}</p>
+        <p className="text-sm text-emerald-600 dark:text-emerald-400">✓ Confirmed {formatDate(profile.confirmedAt)}{profile.hasEmbedding ? "" : " (CV similarity not computed yet)"}</p>
       ) : null}
 
       <form onSubmit={confirm} className="space-y-5">
@@ -258,7 +258,7 @@ export default function ProfilePage() {
               onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })}
               className={inputClass}
             />
-            <span className="text-xs text-gray-500">Used later to check age limits in government circulars.</span>
+            <span className="text-xs text-muted">Used later to check age limits in government circulars.</span>
           </label>
         </div>
 
@@ -276,7 +276,7 @@ export default function ProfilePage() {
         <fieldset className="space-y-3">
           <legend className="flex justify-between gap-2 w-full text-sm font-medium">Education {hint("education")}</legend>
           {form.education.map((e, i) => (
-            <div key={i} className="border rounded-md p-3 grid gap-2 sm:grid-cols-6">
+            <div key={i} className="rounded-xl border border-line bg-surface-2 p-3 grid gap-2 sm:grid-cols-6">
               <select
                 value={e.level}
                 onChange={(ev) => updateEducation(i, { level: ev.target.value as Level })}
@@ -328,7 +328,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => setForm({ ...form, education: form.education.filter((_, j) => j !== i) })}
-                className="rounded-md border px-2 py-1 text-sm sm:col-span-1"
+                className="btn btn-secondary btn-sm sm:col-span-1"
               >
                 Remove
               </button>
@@ -337,7 +337,7 @@ export default function ProfilePage() {
           <button
             type="button"
             onClick={() => setForm({ ...form, education: [...form.education, { ...EMPTY_EDUCATION }] })}
-            className="rounded-md border px-3 py-1 text-sm"
+            className="btn btn-secondary btn-sm"
           >
             + Add education
           </button>
@@ -369,11 +369,11 @@ export default function ProfilePage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <button type="submit" disabled={saving} className="rounded-md bg-blue-600 text-white px-4 py-2 disabled:opacity-50">
+          <button type="submit" disabled={saving} className="btn btn-primary">
             {saving ? "Saving…" : isDraft ? "Confirm profile" : "Save changes"}
           </button>
           {profile || upload ? (
-            <button type="button" onClick={deleteAll} className="rounded-md border border-red-400 text-red-600 px-4 py-2">
+            <button type="button" onClick={deleteAll} className="btn btn-danger">
               Delete my CV data
             </button>
           ) : null}

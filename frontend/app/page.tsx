@@ -1,21 +1,68 @@
 "use client";
 
+import { Loader2, Search, SearchX, ShieldCheck, Sparkles, Briefcase } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import JobCard from "./components/JobCard";
 import { API_URL } from "./lib/api";
 import { saveJob, unsaveJob } from "./lib/saved";
 import { Job } from "./types/job";
 
+// useSearchParams() reads filters from the address (e.g. a notification opens "/?sort=best-match").
+// Next.js wants it inside a <Suspense> boundary; the skeleton shows for the split second before.
 export default function Home() {
-  const [search, setSearch] = useState("");
-  const [location, setLocation] = useState("All");
-  const [jobType, setJobType] = useState("All");
-  const [category, setCategory] = useState("All");
-  const [sort, setSort] = useState("newest");
-  const [matchesOnly, setMatchesOnly] = useState(false);
+  return (
+    <Suspense fallback={<JobsSkeleton />}>
+      <JobsPage />
+    </Suspense>
+  );
+}
+
+function JobsSkeleton() {
+  return (
+    <main className="page space-y-4">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="card h-36 animate-pulse p-5">
+          <div className="flex gap-4">
+            <div className="h-11 w-11 rounded-xl bg-surface-2" />
+            <div className="flex-1 space-y-3">
+              <div className="h-4 w-1/2 rounded bg-surface-2" />
+              <div className="h-3 w-1/3 rounded bg-surface-2" />
+              <div className="h-3 w-2/3 rounded bg-surface-2" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </main>
+  );
+}
+
+function Stat({ icon: Icon, label, value, tone }: { icon: typeof Briefcase; label: string; value: string | number; tone: string }) {
+  return (
+    <div className="card flex items-center gap-3 p-3 sm:p-4">
+      {/* icon only where there's room; on phones the three boxes sit side by side */}
+      <div className={`hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:flex ${tone}`}>
+        <Icon size={20} aria-hidden />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xl font-bold leading-none sm:text-2xl">{value}</p>
+        <p className="mt-1 text-xs leading-tight text-muted">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function JobsPage() {
+  const query = useSearchParams();
+  const [search, setSearch] = useState(() => query.get("search") ?? "");
+  const [location, setLocation] = useState(() => query.get("location") ?? "All");
+  const [jobType, setJobType] = useState(() => query.get("jobType") ?? "All");
+  const [category, setCategory] = useState(() => query.get("category") ?? "All");
+  const [sort, setSort] = useState(() => query.get("sort") ?? "newest");
+  const [matchesOnly, setMatchesOnly] = useState(() => query.get("matchesOnly") === "true");
   const [locations, setLocations] = useState<string[]>([]);
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [reloadKey, setReloadKey] = useState(0);
   // The last finished request: which URL it was for, and what came back.
   const [result, setResult] = useState<{ key: string; jobs: Job[]; error: string; hasPreferences: boolean } | null>(null);
@@ -100,130 +147,158 @@ export default function Home() {
     }
   }
 
-  const controlClass = "border rounded-md px-3 py-2 bg-white text-black";
+  function clearFilters() {
+    setSearch("");
+    setLocation("All");
+    setJobType("All");
+    setCategory("All");
+    setMatchesOnly(false);
+  }
+
   const showInitialLoading = loading && jobs.length === 0 && !error;
+  const matchCount = jobs.filter((j) => j.match?.isMatch).length;
+  const eligibleCount = jobs.filter((j) => j.match?.eligibility?.status === "pass").length;
+  const filtersActive = search || location !== "All" || jobType !== "All" || category !== "All" || matchesOnly;
 
   return (
-    <main className="max-w-3xl mx-auto p-6">
+    <main className="page">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-1">Open jobs</h1>
-        <p className="text-sm">Jobs marked &quot;Demo listing&quot; are sample data, not real vacancies.</p>
+        <h1 className="page-title">Find your next job</h1>
+        <p className="page-sub">Jobs from your sources, matched against your CV and preferences.</p>
       </div>
 
-      {saveError ? <p className="mb-4 text-red-600">{saveError}</p> : null}
-
-      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:flex-wrap">
-        <input
-          type="text"
-          placeholder="Search by title or company"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className={`${controlClass} flex-1 min-w-48`}
-        />
-
-        <select
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          className={controlClass}
-        >
-          <option value="All">All locations</option>
-          {locations.map((place) => (
-            <option key={place} value={place}>
-              {place}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className={controlClass}
-        >
-          <option value="All">All categories</option>
-          <option value="Government">Government</option>
-          <option value="Private">Private</option>
-          <option value="Bank">Bank</option>
-          <option value="NGO">NGO</option>
-          <option value="Internship">Internship</option>
-        </select>
-
-        <select
-          value={jobType}
-          onChange={(e) => setJobType(e.target.value)}
-          className={controlClass}
-        >
-          <option value="All">All job types</option>
-          <option value="Full-time">Full-time</option>
-          <option value="Part-time">Part-time</option>
-          <option value="Internship">Internship</option>
-          <option value="Contract">Contract</option>
-        </select>
-
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value)}
-          className={controlClass}
-        >
-          <option value="newest">Newest first</option>
-          <option value="best-match">Best match first</option>
-          <option value="deadline">Deadline: soonest</option>
-          <option value="salary-high">Salary: high to low</option>
-          <option value="salary-low">Salary: low to high</option>
-        </select>
-
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={matchesOnly}
-            disabled={!hasPreferences}
-            onChange={(e) => setMatchesOnly(e.target.checked)}
-          />
-          Only my matches
-        </label>
+      <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-3">
+        <Stat icon={Briefcase} label={filtersActive ? "Jobs shown" : "Open jobs"} value={showInitialLoading ? "…" : jobs.length} tone="bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" />
+        <Stat icon={Sparkles} label="Match you" value={showInitialLoading ? "…" : matchCount} tone="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" />
+        <Stat icon={ShieldCheck} label="You're eligible for" value={showInitialLoading ? "…" : eligibleCount} tone="bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" />
       </div>
 
       {!hasPreferences ? (
-        <p className="mb-4 rounded-md bg-blue-100 text-blue-900 p-3 text-sm">
+        <div className="alert alert-info mb-6">
           Upload your CV or tell JobPulse what you&apos;re looking for to see a match score on every job.{" "}
-          <Link href="/profile" className="underline font-medium">
+          <Link href="/profile" className="link">
             Upload CV →
           </Link>{" "}
-          <Link href="/preferences" className="underline font-medium">
+          <Link href="/preferences" className="link">
             Set preferences →
           </Link>
-        </p>
+        </div>
       ) : null}
 
-      {error ? (
-        <div className="mb-4">
-          <p>{error}</p>
+      <div className="card mb-6 space-y-3 p-4">
+        <div className="relative">
+          <Search size={18} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" aria-hidden />
+          <input
+            type="search"
+            placeholder="Search by job title or company"
+            aria-label="Search by job title or company"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="input pl-10"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <select value={location} onChange={(e) => setLocation(e.target.value)} aria-label="Location" className="input">
+            <option value="All">All locations</option>
+            {locations.map((place) => (
+              <option key={place} value={place}>
+                {place}
+              </option>
+            ))}
+          </select>
+
+          <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category" className="input">
+            <option value="All">All categories</option>
+            <option value="Government">Government</option>
+            <option value="Private">Private</option>
+            <option value="Bank">Bank</option>
+            <option value="NGO">NGO</option>
+            <option value="Internship">Internship</option>
+          </select>
+
+          <select value={jobType} onChange={(e) => setJobType(e.target.value)} aria-label="Job type" className="input">
+            <option value="All">All job types</option>
+            <option value="Full-time">Full-time</option>
+            <option value="Part-time">Part-time</option>
+            <option value="Internship">Internship</option>
+            <option value="Contract">Contract</option>
+          </select>
+
+          <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort" className="input">
+            <option value="newest">Newest first</option>
+            <option value="best-match">Best match first</option>
+            <option value="deadline">Deadline: soonest</option>
+            <option value="salary-high">Salary: high to low</option>
+            <option value="salary-low">Salary: low to high</option>
+          </select>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setReloadKey((value) => value + 1)}
-            className="mt-3 border rounded-md px-3 py-2"
+            onClick={() => setMatchesOnly((m) => !m)}
+            disabled={!hasPreferences}
+            aria-pressed={matchesOnly}
+            className={`chip inline-flex items-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-50 ${matchesOnly ? "chip-active" : ""}`}
           >
+            <Sparkles size={14} aria-hidden />
+            Only my matches
+          </button>
+          {filtersActive ? (
+            <button type="button" onClick={clearFilters} className="btn btn-ghost btn-sm text-muted">
+              Clear filters
+            </button>
+          ) : null}
+          {loading && !showInitialLoading ? (
+            <span className="ml-auto flex items-center gap-1.5 text-sm text-muted">
+              <Loader2 size={14} className="animate-spin" aria-hidden /> Updating…
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      {saveError ? <p className="alert alert-error mb-4">{saveError}</p> : null}
+
+      {error ? (
+        <div className="alert alert-error mb-4 flex flex-wrap items-center justify-between gap-3">
+          <span>{error}</span>
+          <button type="button" onClick={() => setReloadKey((value) => value + 1)} className="btn btn-secondary btn-sm">
             Try again
           </button>
         </div>
       ) : null}
 
-      {showInitialLoading ? <p>Loading jobs...</p> : null}
+      {showInitialLoading ? (
+        <div className="space-y-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="card h-36 animate-pulse" />
+          ))}
+        </div>
+      ) : null}
 
       {!error && !showInitialLoading ? (
-        <>
-          <p className="mb-4 text-sm">
-            {jobs.length} {jobs.length === 1 ? "job" : "jobs"} found
-            {loading ? " · Updating..." : ""}
-          </p>
-
-          {jobs.length > 0 ? (
-            jobs.map((job) => (
+        jobs.length > 0 ? (
+          <div className="space-y-4">
+            {jobs.map((job) => (
               <JobCard key={job.id} job={job} onToggleSave={toggleSave} busy={busyJobId === job.id} />
-            ))
-          ) : (
-            <p>No jobs found. Try a different search or clear a filter.</p>
-          )}
-        </>
+            ))}
+            <p className="pt-2 text-center text-xs text-muted">
+              Jobs marked &quot;Demo listing&quot; are sample data, not real vacancies.
+            </p>
+          </div>
+        ) : (
+          <div className="card flex flex-col items-center gap-3 p-10 text-center">
+            <SearchX size={36} className="text-muted" aria-hidden />
+            <p className="font-medium">No jobs found</p>
+            <p className="text-sm text-muted">Try a different search, or clear a filter.</p>
+            {filtersActive ? (
+              <button type="button" onClick={clearFilters} className="btn btn-secondary btn-sm">
+                Clear filters
+              </button>
+            ) : null}
+          </div>
+        )
       ) : null}
     </main>
   );

@@ -232,10 +232,9 @@ export default function NotificationSettings() {
     }
   }
 
-  const buttonClass = "rounded-md px-4 py-2 disabled:opacity-50";
 
   return (
-    <section className="border rounded-lg p-4 space-y-3">
+    <section className="card p-5 space-y-3">
       <h2 className="font-semibold">Notifications on this device</h2>
       <p className="text-sm">
         Get a notification when a new job matches you (and you&apos;re not ineligible), and when a job you saved
@@ -260,20 +259,20 @@ export default function NotificationSettings() {
 
       <div className="flex flex-wrap gap-3">
         {state === "off" ? (
-          <button type="button" onClick={turnOn} disabled={busy} className={`${buttonClass} bg-blue-600 text-white`}>
+          <button type="button" onClick={turnOn} disabled={busy} className="btn btn-primary">
             {busy ? "Working…" : "Turn on notifications"}
           </button>
         ) : null}
         {state === "on" ? (
           <>
-            <span className="text-green-600 self-center">✓ On for this browser</span>
-            <button type="button" onClick={sendTest} disabled={busy} className={`${buttonClass} border`}>
+            <span className="text-emerald-600 dark:text-emerald-400 self-center">✓ On for this browser</span>
+            <button type="button" onClick={sendTest} disabled={busy} className="btn btn-secondary btn-sm">
               Send test notification
             </button>
-            <button type="button" onClick={localTest} disabled={busy} className={`${buttonClass} border`}>
+            <button type="button" onClick={localTest} disabled={busy} className="btn btn-secondary btn-sm">
               Show a local test
             </button>
-            <button type="button" onClick={turnOff} disabled={busy} className={`${buttonClass} border`}>
+            <button type="button" onClick={turnOff} disabled={busy} className="btn btn-secondary btn-sm">
               Turn off
             </button>
           </>
@@ -282,13 +281,13 @@ export default function NotificationSettings() {
 
       {step ? <p className="text-sm text-blue-600">{step}</p> : null}
       {message ? (
-        <p className={`text-sm rounded-md p-2 ${message.kind === "ok" ? "bg-green-100 text-green-900" : "bg-red-100 text-red-900"}`}>
+        <p className={`alert ${message.kind === "ok" ? "alert-success" : "alert-error"}`}>
           {message.text}
         </p>
       ) : null}
 
       {diag ? (
-        <details className="text-xs text-gray-500">
+        <details className="text-xs text-muted">
           <summary className="cursor-pointer">Diagnostics (share this if it doesn&apos;t work)</summary>
           <ul className="mt-1 space-y-0.5 font-mono">
             <li>browser: {diag.browser}</li>

@@ -1,6 +1,7 @@
 "use client";
 
 // "My applications": every job you saved, with its status, notes and deadline.
+import { BookmarkPlus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import DeadlineBadge, { daysLeft } from "../components/DeadlineBadge";
@@ -35,17 +36,24 @@ export default function SavedPage() {
 
   if (error) {
     return (
-      <main className="max-w-3xl mx-auto p-6">
-        <p className="text-red-600">{error}</p>
-        <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="mt-3 border rounded-md px-3 py-2">
-          Try again
-        </button>
+      <main className="page-narrow">
+        <div className="alert alert-error flex flex-wrap items-center justify-between gap-3">
+          <span>{error}</span>
+          <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="btn btn-secondary btn-sm">
+            Try again
+          </button>
+        </div>
       </main>
     );
   }
 
   if (!items) {
-    return <main className="max-w-3xl mx-auto p-6">Loading…</main>;
+    return (
+      <main className="page-narrow space-y-4">
+        <div className="h-8 w-56 animate-pulse rounded-lg bg-surface-2" />
+        <div className="card h-40 animate-pulse" />
+      </main>
+    );
   }
 
   const counts = Object.fromEntries(
@@ -60,24 +68,25 @@ export default function SavedPage() {
   const visible = filter === "all" ? items : items.filter((i) => i.status === filter);
 
   return (
-    <main className="max-w-3xl mx-auto p-6 space-y-6">
+    <main className="page-narrow space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-1">My applications</h1>
-        <p className="text-sm">Jobs you saved, nearest deadline first. Change the status as you go.</p>
+        <h1 className="page-title">My applications</h1>
+        <p className="page-sub">Jobs you saved, nearest deadline first. Change the status as you go.</p>
       </div>
 
       {items.length === 0 ? (
-        <p>
-          Nothing saved yet. Press <strong>☆ Save</strong> on a job in the{" "}
-          <Link href="/" className="underline">
-            job list
+        <div className="card flex flex-col items-center gap-3 p-10 text-center">
+          <BookmarkPlus size={36} className="text-muted" aria-hidden />
+          <p className="font-medium">Nothing saved yet</p>
+          <p className="text-sm text-muted">Press Save on a job you like and track it here until you get the offer.</p>
+          <Link href="/" className="btn btn-primary btn-sm">
+            Browse jobs
           </Link>
-          .
-        </p>
+        </div>
       ) : (
         <>
           {dueSoon.length > 0 ? (
-            <section className="rounded-md border border-red-300 bg-red-50 text-red-900 p-3">
+            <section className="alert alert-error">
               <h2 className="font-semibold">Apply soon — deadline in 3 days or less</h2>
               <ul className="list-disc ml-5 text-sm mt-1">
                 {dueSoon.map((i) => (
@@ -100,9 +109,7 @@ export default function SavedPage() {
                   role="tab"
                   aria-selected={active}
                   onClick={() => setFilter(f)}
-                  className={`rounded-full px-3 py-1 text-sm border ${
-                    active ? "bg-blue-600 text-white border-blue-600" : f === "all" ? "" : STATUS_COLORS[f]
-                  }`}
+                  className={active ? "chip chip-active" : f === "all" ? "chip" : `chip border-transparent ${STATUS_COLORS[f]}`}
                 >
                   {f === "all" ? "All" : STATUS_LABELS[f].split(" —")[0]} ({count})
                 </button>
@@ -111,7 +118,7 @@ export default function SavedPage() {
           </div>
 
           {visible.length === 0 ? (
-            <p>No jobs with this status.</p>
+            <p className="text-sm text-muted">No jobs with this status.</p>
           ) : (
             <ul className="space-y-4">
               {visible.map((item) => (

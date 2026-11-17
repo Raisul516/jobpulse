@@ -1,3 +1,4 @@
+import { Banknote, Bookmark, BookmarkCheck, Building2, ExternalLink, MapPin, Tag } from "lucide-react";
 import Link from "next/link";
 import { STATUS_LABELS } from "../lib/saved";
 import { Job } from "../types/job";
@@ -20,12 +21,39 @@ function formatSalary(min: number | null, max: number | null): string {
   return `${(max ?? min)!.toLocaleString()} BDT`;
 }
 
+// A coloured square with the company's initials, so cards are easy to tell apart at a glance.
+const AVATAR_COLORS = [
+  "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+  "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+  "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+  "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
+  "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300",
+];
+
+function CompanyAvatar({ name }: { name: string }) {
+  const initials = name
+    .replace(/\b(ltd|limited|pvt|plc|co|inc)\b\.?/gi, "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+  const color = AVATAR_COLORS[[...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % AVATAR_COLORS.length];
+  return (
+    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${color}`} aria-hidden>
+      {initials || "?"}
+    </div>
+  );
+}
+
 function SaveButton({ job, onToggleSave, busy }: Required<Pick<JobCardProps, "job" | "onToggleSave">> & { busy?: boolean }) {
   // Already past "saved" (applied, interview...): don't let one click throw that away — link to the tracker instead.
   if (job.savedStatus && job.savedStatus !== "saved") {
     return (
-      <Link href="/saved" className="text-sm rounded-md border px-3 py-1 whitespace-nowrap">
-        ★ {STATUS_LABELS[job.savedStatus]}
+      <Link href="/saved" className="btn btn-secondary btn-sm">
+        <BookmarkCheck size={16} aria-hidden />
+        {STATUS_LABELS[job.savedStatus]}
       </Link>
     );
   }
@@ -37,43 +65,66 @@ function SaveButton({ job, onToggleSave, busy }: Required<Pick<JobCardProps, "jo
       onClick={() => onToggleSave(job)}
       disabled={busy}
       aria-pressed={saved}
-      className={`text-sm rounded-md border px-3 py-1 whitespace-nowrap disabled:opacity-50 ${
-        saved ? "bg-yellow-100 text-yellow-900 border-yellow-300" : ""
-      }`}
+      className={`btn btn-sm ${saved ? "btn-secondary text-brand" : "btn-secondary"}`}
     >
-      {saved ? "★ Saved" : "☆ Save"}
+      {saved ? <BookmarkCheck size={16} aria-hidden /> : <Bookmark size={16} aria-hidden />}
+      {saved ? "Saved" : "Save"}
     </button>
   );
 }
 
 export default function JobCard({ job, onToggleSave, busy }: JobCardProps) {
   return (
-    <div className="border rounded-lg p-4 mb-4 shadow-sm hover:shadow-lg transition-shadow">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <h2 className="text-lg font-semibold">{job.title}</h2>
-        <DeadlineBadge deadline={job.deadline} />
-      </div>
-      <p>{job.company}</p>
-      <p className="text-sm mt-1">
-        {job.location} · {job.jobType} · {job.category}
-      </p>
-      <p className="text-sm">Salary: {formatSalary(job.salaryMin, job.salaryMax)}</p>
-      {job.match ? (
-        <div className="mt-2 flex flex-wrap items-start gap-x-3 gap-y-1">
-          <MatchBadge match={job.match} />
-          {job.match.eligibility ? <EligibilityBadge eligibility={job.match.eligibility} /> : null}
+    <article className={`card card-hover p-5 ${job.match?.isMatch ? "ring-1 ring-emerald-400/50" : ""}`}>
+      <div className="flex gap-4">
+        <CompanyAvatar name={job.company} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold leading-snug">{job.title}</h2>
+              <p className="flex items-center gap-1.5 text-sm text-muted">
+                <Building2 size={14} aria-hidden />
+                {job.company}
+              </p>
+            </div>
+            <DeadlineBadge deadline={job.deadline} />
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+            <span className="flex items-center gap-1.5">
+              <MapPin size={14} aria-hidden />
+              {job.location}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Tag size={14} aria-hidden />
+              {job.jobType} · {job.category}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Banknote size={14} aria-hidden />
+              {formatSalary(job.salaryMin, job.salaryMax)}
+            </span>
+          </div>
+
+          {job.match ? (
+            <div className="mt-3 flex flex-wrap items-start gap-2">
+              <MatchBadge match={job.match} />
+              {job.match.eligibility ? <EligibilityBadge eligibility={job.match.eligibility} /> : null}
+            </div>
+          ) : null}
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {job.applyUrl ? (
+              <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm">
+                Apply / view
+                <ExternalLink size={14} aria-hidden />
+              </a>
+            ) : null}
+            {onToggleSave ? <SaveButton job={job} onToggleSave={onToggleSave} busy={busy} /> : null}
+            {job.isDemo ? <span className="badge badge-amber ml-auto">Demo listing</span> : null}
+          </div>
         </div>
-      ) : null}
-      <div className="flex flex-wrap items-center gap-3 mt-3">
-        {onToggleSave ? <SaveButton job={job} onToggleSave={onToggleSave} busy={busy} /> : null}
-        {job.applyUrl ? (
-          <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline">
-            Apply / view original ↗
-          </a>
-        ) : null}
-        {job.isDemo ? <span className="text-xs text-amber-700">Demo listing</span> : null}
       </div>
-    </div>
+    </article>
   );
 }
 

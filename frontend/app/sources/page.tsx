@@ -108,29 +108,29 @@ export default function SourcesPage() {
   }
 
   const messageClass = {
-    ok: "bg-green-100 text-green-900",
-    warn: "bg-amber-100 text-amber-900",
-    error: "bg-red-100 text-red-900",
+    ok: "alert-success",
+    warn: "alert-warn",
+    error: "alert-error",
   };
 
   return (
-    <main className="max-w-3xl mx-auto p-6 space-y-6">
+    <main className="page-narrow space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-1">Sources</h1>
-        <p className="text-sm">
+        <h1 className="page-title">Sources</h1>
+        <p className="page-sub">
           Companies whose career pages JobPulse checks automatically every 3 hours. New jobs are added to the{" "}
-          <Link href="/" className="underline">
+          <Link href="/" className="link">
             job list
           </Link>
           ; anything unclear waits in{" "}
-          <Link href="/import" className="underline">
+          <Link href="/import" className="link">
             your review list
           </Link>
           .
         </p>
       </div>
 
-      <form onSubmit={add} className="border rounded-lg p-4 space-y-3">
+      <form onSubmit={add} className="card p-5 space-y-3">
         <h2 className="font-semibold">Add a company</h2>
         <p className="text-sm">
           Paste a link to the company&apos;s careers page or any one of its job posts.
@@ -143,13 +143,13 @@ export default function SourcesPage() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://jobs.smartrecruiters.com/CompanyName/…"
-            className="flex-1 border rounded-md px-3 py-2 bg-white text-black"
+            className="input flex-1"
           />
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value as JobCategory)}
             aria-label="Category for this company's jobs"
-            className="border rounded-md px-3 py-2 bg-white text-black"
+            className="input"
           >
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
@@ -157,13 +157,13 @@ export default function SourcesPage() {
               </option>
             ))}
           </select>
-          <button type="submit" disabled={adding} className="rounded-md bg-blue-600 text-white px-4 py-2 disabled:opacity-50">
+          <button type="submit" disabled={adding} className="btn btn-primary">
             {adding ? "Checking…" : "Add"}
           </button>
         </div>
       </form>
 
-      {message ? <p className={`rounded-md p-3 ${messageClass[message.kind]}`}>{message.text}</p> : null}
+      {message ? <p className={`alert ${messageClass[message.kind]}`}>{message.text}</p> : null}
       {loadError ? <p className="text-red-600">{loadError}</p> : null}
 
       {sources === null && !loadError ? <p>Loading…</p> : null}
@@ -171,7 +171,7 @@ export default function SourcesPage() {
 
       <ul className="space-y-3">
         {sources?.map((s) => (
-          <li key={s.id} className={`border rounded-lg p-4 space-y-2 ${s.enabled ? "" : "opacity-60"}`}>
+          <li key={s.id} className={`card p-5 space-y-2 ${s.enabled ? "" : "opacity-60"}`}>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h2 className="font-semibold">{s.name}</h2>
@@ -180,7 +180,7 @@ export default function SourcesPage() {
                   {s.baseUrl ? (
                     <>
                       {" · "}
-                      <a href={s.baseUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                      <a href={s.baseUrl} target="_blank" rel="noopener noreferrer" className="link">
                         careers page ↗
                       </a>
                     </>
@@ -192,7 +192,7 @@ export default function SourcesPage() {
                 disabled={busyId === s.id}
                 onChange={(e) => update(s, { defaultCategory: e.target.value as JobCategory })}
                 aria-label={`Category for ${s.name}`}
-                className="border rounded-md px-2 py-1 bg-white text-black text-sm"
+                className="input w-auto py-1"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -202,7 +202,7 @@ export default function SourcesPage() {
               </select>
             </div>
 
-            <p className={`text-sm ${s.lastRunOk === false ? "text-red-600" : "text-gray-500"}`}>
+            <p className={`text-sm ${s.lastRunOk === false ? "text-red-600" : "text-muted"}`}>
               {s.lastRunAt ? `Last checked ${timeAgo(s.lastRunAt)}: ${s.lastRunMessage}` : "Not checked yet"}
             </p>
 
@@ -211,7 +211,7 @@ export default function SourcesPage() {
                 type="button"
                 onClick={() => runNow(s)}
                 disabled={busyId === s.id || !s.enabled}
-                className="rounded-md border px-3 py-1 disabled:opacity-50"
+                className="btn btn-secondary btn-sm"
               >
                 {busyId === s.id ? "Checking…" : "Check now"}
               </button>

@@ -64,13 +64,13 @@ export default function ImportPage() {
   }
 
   return (
-    <main className="max-w-3xl mx-auto p-6 space-y-6">
+    <main className="page-narrow space-y-6">
       <div>
-        <Link href="/" className="text-sm underline">
+        <Link href="/" className="text-sm link">
           ← Back to jobs
         </Link>
-        <h1 className="text-3xl font-bold mt-2">Add a job from a link</h1>
-        <p className="text-sm mt-1">
+        <h1 className="page-title mt-2">Add a job from a link</h1>
+        <p className="page-sub">
           Paste a link to a job post. JobPulse reads the page and fills in what it can — you check it before it&apos;s saved.
         </p>
       </div>
@@ -82,15 +82,15 @@ export default function ImportPage() {
           placeholder="https://company.com/careers/job-123"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          className="flex-1 border rounded-md px-3 py-2 bg-white text-black"
+          className="input flex-1"
         />
-        <button type="submit" disabled={reading} className="rounded-md bg-blue-600 text-white px-4 py-2 disabled:opacity-50">
+        <button type="submit" disabled={reading} className="btn btn-primary">
           {reading ? "Reading page…" : "Read page"}
         </button>
       </form>
 
       {error ? <p className="text-red-600">{error}</p> : null}
-      {message ? <p className="rounded-md bg-green-100 text-green-900 p-3">{message}</p> : null}
+      {message ? <p className="alert alert-success">{message}</p> : null}
 
       {current ? <ReviewForm key={current.id} item={current} onDone={finished} /> : null}
 
@@ -101,13 +101,13 @@ export default function ImportPage() {
             {pending
               .filter((p) => p.id !== current?.id)
               .map((p) => (
-                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 border rounded-md p-3">
+                <li key={p.id} className="card flex flex-wrap items-center justify-between gap-2 p-4">
                   <span className="break-all">
                     {p.extracted?.title?.value ?? "Untitled"}
-                    <span className="block text-xs text-gray-500">{p.sourceUrl}</span>
+                    <span className="block text-xs text-muted">{p.sourceUrl}</span>
                     {p.reviewReason ? <span className="block text-xs text-blue-700">{p.reviewReason}</span> : null}
                   </span>
-                  <button type="button" onClick={() => openPending(p.id)} className="rounded-md border px-3 py-1">
+                  <button type="button" onClick={() => openPending(p.id)} className="btn btn-secondary btn-sm">
                     Review
                   </button>
                 </li>

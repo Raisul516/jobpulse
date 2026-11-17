@@ -91,21 +91,21 @@ export default function PreferencesPage() {
   }
 
   const fieldError = (name: string) => fieldErrors.find((f) => f.path.startsWith(name))?.message;
-  const inputClass = "w-full border rounded-md px-3 py-2 bg-white text-black";
+  const inputClass = "input";
   const chip = (active: boolean) =>
-    `rounded-full border px-3 py-1 text-sm ${active ? "bg-blue-600 text-white border-blue-600" : ""}`;
+    `chip ${active ? "chip-active" : ""}`;
 
   if (!loaded) {
-    return <main className="max-w-3xl mx-auto p-6">{error ? <p className="text-red-600">{error}</p> : "Loading…"}</main>;
+    return <main className="page-narrow">{error ? <p className="text-red-600">{error}</p> : "Loading…"}</main>;
   }
 
   // Locations: common Bangladeshi ones plus anything already saved
   const locationOptions = [...new Set([...COMMON_LOCATIONS, ...prefs.locations])];
 
   return (
-    <main className="max-w-3xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-1">Preferences</h1>
-      <p className="text-sm mb-6">
+    <main className="page-narrow">
+      <h1 className="page-title">Preferences</h1>
+      <p className="page-sub mb-6">
         What kind of job are you looking for? JobPulse gives every job a match score from these.
         Leave a section empty to accept anything.
       </p>
@@ -118,7 +118,7 @@ export default function PreferencesPage() {
         <section className="space-y-2">
           <label className="block">
             <span className="font-medium">Keywords</span>
-            <span className="block text-sm text-gray-500">
+            <span className="block text-sm text-muted">
               Skills or job titles, separated by commas. A keyword in the job title counts most.
             </span>
             <input
@@ -132,7 +132,7 @@ export default function PreferencesPage() {
 
           <label className="block">
             <span className="font-medium">Skip jobs whose title has</span>
-            <span className="block text-sm text-gray-500">Comma-separated, e.g. senior, lead, sales</span>
+            <span className="block text-sm text-muted">Comma-separated, e.g. senior, lead, sales</span>
             <input
               value={excludeText}
               onChange={(e) => setExcludeText(e.target.value)}
@@ -157,7 +157,7 @@ export default function PreferencesPage() {
               </button>
             ))}
           </div>
-          <p className="text-sm text-gray-500">{prefs.categories.length ? "" : "None selected = all categories"}</p>
+          <p className="text-sm text-muted">{prefs.categories.length ? "" : "None selected = all categories"}</p>
         </fieldset>
 
         <fieldset className="space-y-2">
@@ -175,7 +175,7 @@ export default function PreferencesPage() {
               </button>
             ))}
           </div>
-          <p className="text-sm text-gray-500">{prefs.jobTypes.length ? "" : "None selected = all job types"}</p>
+          <p className="text-sm text-muted">{prefs.jobTypes.length ? "" : "None selected = all job types"}</p>
         </fieldset>
 
         <fieldset className="space-y-2">
@@ -193,7 +193,7 @@ export default function PreferencesPage() {
               </button>
             ))}
           </div>
-          <p className="text-sm text-gray-500">{prefs.locations.length ? "" : "None selected = anywhere"}</p>
+          <p className="text-sm text-muted">{prefs.locations.length ? "" : "None selected = anywhere"}</p>
         </fieldset>
 
         <section className="grid gap-4 sm:grid-cols-2">
@@ -207,7 +207,7 @@ export default function PreferencesPage() {
               placeholder="No minimum"
               className={`${inputClass} mt-1`}
             />
-            <span className="block text-sm text-gray-500">Jobs that don&apos;t state a salary are still shown.</span>
+            <span className="block text-sm text-muted">Jobs that don&apos;t state a salary are still shown.</span>
           </label>
 
           <label className="block">
@@ -221,7 +221,7 @@ export default function PreferencesPage() {
               onChange={(e) => setPrefs({ ...prefs, matchThreshold: Number(e.target.value) })}
               className="w-full mt-3"
             />
-            <span className="block text-sm text-gray-500">
+            <span className="block text-sm text-muted">
               70% ≈ one of your keywords is in the job title. Higher = fewer, closer matches.
             </span>
           </label>
@@ -237,9 +237,9 @@ export default function PreferencesPage() {
         </label>
 
         {error ? <p className="text-red-600">{error}</p> : null}
-        {message ? <p className="rounded-md bg-green-100 text-green-900 p-3">{message}</p> : null}
+        {message ? <p className="alert alert-success">{message}</p> : null}
 
-        <button type="submit" disabled={saving} className="rounded-md bg-blue-600 text-white px-4 py-2 disabled:opacity-50">
+        <button type="submit" disabled={saving} className="btn btn-primary">
           {saving ? "Saving…" : "Save preferences"}
         </button>
       </form>
