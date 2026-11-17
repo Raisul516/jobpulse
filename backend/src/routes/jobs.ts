@@ -2,23 +2,8 @@ import { Router } from "express";
 import { currentUserId } from "../lib/currentUser";
 import { findPossibleDuplicates } from "../lib/importQueries";
 import { findJobById, findJobs, findLocations } from "../lib/jobQueries";
-import { checkEligibility, extractRequirements } from "../lib/eligibility";
-import { similarities } from "../lib/jobEmbeddings";
-import { matchJob, Preferences } from "../lib/matching";
-import { getPreferences } from "../lib/preferences";
-import { getProfileForMatching } from "../lib/profile";
+import { addMatches } from "../lib/matchForUser";
 import { JOB_CATEGORIES, JOB_TYPES, JobCategory, JobSort, JobType, SORTS } from "../types/job";
-
-// Used when you uploaded a CV but haven't set preferences: no filters, default threshold.
-const DEFAULT_PREFERENCES: Preferences = {
-  keywords: [],
-  excludeKeywords: [],
-  categories: [],
-  jobTypes: [],
-  locations: [],
-  minSalary: null,
-  matchThreshold: 70,
-};
 
 export const jobsRouter = Router();
 
@@ -66,35 +51,11 @@ jobsRouter.get("/", async (req, res) => {
     userId
   );
 
-  // Add "how well does this match me?" to every job — from your preferences and/or your confirmed CV.
-  // (null when you have set neither)
-  const [savedPrefs, profile] = await Promise.all([getPreferences(userId), getProfileForMatching(userId)]);
-  const prefs = savedPrefs ?? (profile ? DEFAULT_PREFERENCES : null);
-  const similarity = profile?.embedding ? await similarities(profile.embedding, jobs.map((j) => j.id)) : new Map<number, number>();
+  // Add "how well does this match me?" to every job (see lib/matchForUser.ts)
+  const matched = await addMatches(userId, jobs);
+  let result = matched.jobs;
 
-  let result = jobs.map((job) => ({
-    ...job,
-    match: prefs
-      ? matchJob(
-          job,
-          prefs,
-          profile
-            ? {
-                skills: profile.skills,
-                similarity: similarity.get(job.id) ?? null,
-                // the job's mandatory requirements, checked against your confirmed profile
-                eligibility: checkEligibility(extractRequirements(`${job.title}
-${job.description ?? ""}`), profile, {
-                  deadline: job.deadline,
-                  isGovernment: job.category === "Government",
-                }),
-              }
-            : undefined
-        )
-      : null,
-  }));
-
-  if (firstString(req.query.matchesOnly) === "true" && prefs) {
+  if (firstString(req.query.matchesOnly) === "true" && matched.hasPreferences) {
     result = result.filter((job) => job.match?.isMatch);
   }
   if (sort === "best-match") {
@@ -107,7 +68,7 @@ ${job.description ?? ""}`), profile, {
     );
   }
 
-  res.json({ jobs: result, count: result.length, hasPreferences: prefs !== null, hasCvProfile: profile !== null });
+  res.json({ jobs: result, count: result.length, hasPreferences: matched.hasPreferences, hasCvProfile: matched.hasCvProfile });
 });
 
 // GET /api/jobs/locations — must be above "/:id", otherwise "locations" is read as an id.

@@ -208,6 +208,41 @@ export const cvUploads = pgTable("cv_uploads", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ---------- Notifications ----------
+
+// One row per browser/phone that allowed notifications. The browser gives us these three values;
+// the push service (Google/Mozilla/Apple) delivers messages to `endpoint`.
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(), // encryption key from the browser
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"), // so you can tell your devices apart
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+});
+
+export const notificationKindEnum = pgEnum("notification_kind", ["new_match", "deadline_3_days", "deadline_1_day"]);
+
+// What was already sent, so the same job never notifies twice.
+export const notificationLog = pgTable(
+  "notification_log",
+  {
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    jobId: integer("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    kind: notificationKindEnum("kind").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.jobId, t.kind] })]
+);
+
 // ---------- What the user is looking for ----------
 
 // One row per user. Empty lists mean "any".

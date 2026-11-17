@@ -69,6 +69,16 @@ Free and private: no AI API, nothing leaves the computer.
 - **Filters are separate from the score**: a job that fails a filter is never a match, whatever its score.
 - The score is a weighted average of the parts you have: your keywords (40%), similarity to your CV (35%), your CV skills found in the job (25%). Keyword in the title = 70, each extra title keyword +15, each description-only keyword +5. CV similarity: cosine 0.2 → 0%, 0.6 → 100% (starting calibration). See `backend/src/lib/matching.ts`.
 
+### Notifications (Web Push) — turn on at http://localhost:3000/preferences
+
+- **New match**: a real (not demo) job added in the last 7 days that matches you (score ≥ threshold, passes filters, not ineligible). Up to 3 separate notifications, more become one summary.
+- **Deadline reminders**: jobs you saved but haven't applied to, 3 days and 1 day before the deadline.
+- Each job notifies once (`notification_log`). Runs every 30 minutes and right after new jobs are embedded.
+- Setup: VAPID keys in `backend/.env` (`npx web-push generate-vapid-keys`). Push works on `http://localhost` in Chrome/Edge/Firefox; **on a phone the site must be served over HTTPS** (deploy, or a tunnel).
+- Only endpoints of real push services (Google, Mozilla, Microsoft, Apple) are accepted — the server POSTs to them, so anything else could be abused (SSRF).
+- `GET /api/push/config`, `GET /api/push/devices`, `POST/DELETE /api/push/subscribe`, `POST /api/push/test`, `POST /api/push/run`
+- Service worker: `frontend/public/sw.js`; app manifest: `frontend/app/manifest.ts` (installable PWA).
+
 ### Eligibility (pass / fail / unknown)
 
 With a confirmed CV profile, every job gets `match.eligibility`: mandatory requirements read from the job text by rules (`backend/src/lib/eligibility.ts`) — age limit (checked on the circular's "as on" date, else the deadline), minimum education level, subject, CGPA (4.00 scale), years of experience — each checked against your profile.

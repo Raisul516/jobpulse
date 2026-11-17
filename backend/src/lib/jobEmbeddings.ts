@@ -38,7 +38,11 @@ export async function embedMissingJobs(): Promise<number> {
   } finally {
     running = false;
   }
-  if (done) console.log(`[embeddings] embedded ${done} job(s)`);
+  if (done) {
+    console.log(`[embeddings] embedded ${done} job(s)`);
+    // new jobs can now be scored against your CV -> check whether any should notify you
+    void import("./notifier").then((m) => m.runNotifier()).catch((err) => console.error("[notify] failed:", err));
+  }
   return done;
 }
 

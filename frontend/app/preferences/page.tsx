@@ -3,6 +3,7 @@
 // "Preferences": what kind of job you want. Used for the match score on every job
 // and (next step) for deciding which new jobs to send to your phone.
 import { FormEvent, useEffect, useState } from "react";
+import NotificationSettings from "../components/NotificationSettings";
 import { api, ApiError, FieldError } from "../lib/api";
 import { JobCategory, JobType } from "../types/job";
 
@@ -108,6 +109,10 @@ export default function PreferencesPage() {
         What kind of job are you looking for? JobPulse gives every job a match score from these.
         Leave a section empty to accept anything.
       </p>
+
+      <div className="mb-6">
+        <NotificationSettings />
+      </div>
 
       <form onSubmit={save} className="space-y-6">
         <section className="space-y-2">
@@ -228,7 +233,7 @@ export default function PreferencesPage() {
             checked={prefs.notifyEnabled}
             onChange={(e) => setPrefs({ ...prefs, notifyEnabled: e.target.checked })}
           />
-          Send me notifications for new matching jobs (phone alerts come in the next update)
+          Notify me about new matching jobs (deadline reminders for saved jobs are always sent)
         </label>
 
         {error ? <p className="text-red-600">{error}</p> : null}
