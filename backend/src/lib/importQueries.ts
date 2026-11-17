@@ -54,7 +54,8 @@ export async function createImport(url: string): Promise<{ record: ImportRecord;
     .select(importColumns)
     .from(jobSourceRecords)
     .where(and(eq(jobSourceRecords.sourceId, sourceId), eq(jobSourceRecords.normalizedUrl, normalized)));
-  if (existing) return { record: existing, alreadyExisted: true };
+  // Already reviewed: keep the user's decision, don't read the page again.
+  if (existing && existing.reviewStatus !== "pending") return { record: existing, alreadyExisted: true };
 
   let html: string | null = null;
   let extracted: ExtractedJob | null = null;
@@ -69,24 +70,41 @@ export async function createImport(url: string): Promise<{ record: ImportRecord;
     fetchError = err.message;
   }
 
+  const snapshot = {
+    rawTitle: extracted?.title?.value ?? null,
+    rawCompany: extracted?.company?.value ?? null,
+    rawContent: html,
+    contentHash: html ? createHash("sha256").update(html).digest("hex") : null,
+    extracted,
+    fetchError,
+    fetchedAt: new Date(),
+  };
+
+  // Still waiting for review: refresh the draft with a fresh read of the page
+  // (the page may have changed, or JobPulse's parser may have improved since).
+  if (existing) {
+    const [refreshed] = await db
+      .update(jobSourceRecords)
+      .set(snapshot)
+      .where(and(eq(jobSourceRecords.id, existing.id), eq(jobSourceRecords.reviewStatus, "pending")))
+      .returning(importColumns);
+    return { record: refreshed ?? (await findImportById(existing.id))!, alreadyExisted: true };
+  }
+
   const [record] = await db
     .insert(jobSourceRecords)
-    .values({
-      sourceId,
-      sourceUrl: url,
-      normalizedUrl: normalized,
-      rawTitle: extracted?.title?.value,
-      rawCompany: extracted?.company?.value,
-      rawContent: html,
-      contentHash: html ? createHash("sha256").update(html).digest("hex") : null,
-      extracted,
-      fetchError,
-    })
+    .values({ sourceId, sourceUrl: url, normalizedUrl: normalized, ...snapshot })
     // two requests for the same link at the same moment: keep the first
     .onConflictDoNothing()
     .returning(importColumns);
 
-  if (!record) return createImport(url);
+  if (!record) {
+    const [winner] = await db
+      .select(importColumns)
+      .from(jobSourceRecords)
+      .where(and(eq(jobSourceRecords.sourceId, sourceId), eq(jobSourceRecords.normalizedUrl, normalized)));
+    return { record: winner, alreadyExisted: true };
+  }
   return { record, alreadyExisted: false };
 }
 

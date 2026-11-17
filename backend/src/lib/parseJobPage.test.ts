@@ -170,6 +170,46 @@ describe("parseJobPage", () => {
     expect(job.category?.value).toBe("Bank");
   });
 
+  it("reads schema.org microdata (SmartRecruiters-style pages)", () => {
+    // Same structure as a real SmartRecruiters job page: data in itemprop attributes, not JSON.
+    const html = `
+      <html><head><title>Trainee Engineer</title></head><body>
+      <main itemscope itemtype="http://schema.org/JobPosting">
+        <h1 itemprop="title">Trainee Engineer</h1>
+        <ul>
+          <li itemprop="jobLocation" itemscope itemtype="http://schema.org/Place">
+            <span itemprop="address" itemscope itemtype="http://schema.org/PostalAddress">
+              <meta itemprop="addressCountry" content="Bangladesh">
+              <meta itemprop="addressLocality" content="Dhaka">
+              <meta itemprop="addressRegion">
+              <meta itemprop="streetAddress" content="Road 1, Banani">
+            </span>
+          </li>
+          <li itemprop="employmentType">Full-time</li>
+        </ul>
+        <div itemprop="hiringOrganization" itemscope itemtype="http://schema.org/Organization">
+          <meta itemprop="name" content="Example Coders Ltd.">
+        </div>
+        <meta itemprop="datePosted" content="2026-11-12T13:21:07.599Z">
+        <div itemprop="description">
+          <h2>Job Description</h2><p>Learn and build software.</p>
+          <div itemprop="incentives"><p>Monthly compensation ranging from BDT 35,000 to 45,000</p></div>
+          <p>Application Deadline: November 18, 2026</p>
+        </div>
+      </main></body></html>`;
+
+    const job = parseJobPage(html, "https://jobs.smartrecruiters.com/Example/1-trainee-engineer");
+
+    expect(job.title).toEqual({ value: "Trainee Engineer", foundBy: "structured" });
+    expect(job.company).toEqual({ value: "Example Coders Ltd.", foundBy: "structured" });
+    expect(job.location).toEqual({ value: "Dhaka", foundBy: "structured" });
+    expect(job.jobType).toEqual({ value: "Full-time", foundBy: "structured" });
+    expect(job.description?.value).toContain("Learn and build software.");
+    expect(job.deadline?.value).toBe("2026-11-18");
+    expect(job.salaryMin?.value).toBe(35000);
+    expect(job.salaryMax?.value).toBe(45000);
+  });
+
   it("marks .gov.bd pages as Government", () => {
     const job = parseJobPage("<html><body><h1>Office Assistant</h1></body></html>", "https://example.gov.bd/notice/1");
     expect(job.category?.value).toBe("Government");

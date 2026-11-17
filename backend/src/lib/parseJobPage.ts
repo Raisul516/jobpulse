@@ -1,6 +1,7 @@
 // Reads a job page's HTML and GUESSES the job details.
 // The result is only a draft: the user always reviews it before it becomes a job.
 import * as cheerio from "cheerio";
+import type { Element } from "domhandler";
 import type { ExtractedJob, FoundBy } from "../types/extracted";
 
 type CheerioRoot = ReturnType<typeof cheerio.load>;
@@ -248,7 +249,38 @@ function hasType(obj: JsonObject, type: string): boolean {
   return t === type || (Array.isArray(t) && t.includes(type));
 }
 
+// Microdata: the same schema.org data, written as HTML attributes instead of JSON:
+//   <div itemscope itemtype="http://schema.org/JobPosting"><h1 itemprop="title">…</h1> …
+// We turn it into the same shape as JSON-LD so the rest of the code doesn't care which one the page used.
+function readMicrodataItem($: CheerioRoot, item: Element): JsonObject {
+  const type = $(item).attr("itemtype")?.split("/").pop();
+  const result: JsonObject = type ? { "@type": type } : {};
+
+  $(item)
+    .find("[itemprop]")
+    .each((_i, prop) => {
+      // Only this item's own properties, not ones that belong to an item nested inside it.
+      if ($(prop).parent().closest("[itemscope]")[0] !== item) return;
+
+      const $prop = $(prop);
+      const name = $prop.attr("itemprop")!.trim().split(/\s+/)[0];
+      let value: unknown;
+      if ($prop.is("[itemscope]")) value = readMicrodataItem($, prop);
+      else if ($prop.attr("content") !== undefined) value = $prop.attr("content");
+      else if ($prop.is("a, link")) value = $prop.attr("href");
+      else if ($prop.is("time")) value = $prop.attr("datetime") ?? $prop.text();
+      else if (name === "description") value = $prop.html() ?? ""; // keep HTML, like JSON-LD does
+      else value = $prop.text();
+
+      const existing = result[name];
+      result[name] = existing === undefined ? value : ([] as unknown[]).concat(existing, value);
+    });
+
+  return result;
+}
+
 // JSON-LD can be one object, an array, or wrapped in "@graph". Search all of them.
+// If there's none, try microdata.
 function findJobPosting($: CheerioRoot): JsonObject | undefined {
   const queue: unknown[] = [];
   $('script[type="application/ld+json"]').each((_i, el) => {
@@ -266,7 +298,9 @@ function findJobPosting($: CheerioRoot): JsonObject | undefined {
       if (item["@graph"]) queue.push(item["@graph"]);
     }
   }
-  return undefined;
+
+  const microdata = $('[itemscope][itemtype$="schema.org/JobPosting"]').first()[0];
+  return microdata ? readMicrodataItem($, microdata) : undefined;
 }
 
 function nameOf(value: unknown): string | undefined {
