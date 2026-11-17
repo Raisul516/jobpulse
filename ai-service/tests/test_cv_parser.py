@@ -4,7 +4,7 @@ from datetime import date
 import pytest
 from docx import Document
 
-from app.cv_parser import find_education, find_skills, parse_cv, parse_date, split_sections
+from app.cv_parser import find_education, find_skills, parse_cv, parse_date, skills_from_section, split_sections
 from app.cv_text import CvReadError, extract_text
 
 # A made-up CV in a typical Bangladeshi format (not a real person).
@@ -59,6 +59,37 @@ def test_skills_with_different_spellings():
     assert "R" not in skills
 
 
+def test_skills_section_with_group_labels_and_unknown_skills():
+    # Grouped skills, as PDFs often extract them: labels mid-line and items wrapped across lines
+    section = [
+        "Languages: Python, JavaScript, C/C++, SQL Web/Backend: React, Node.js, Express.js, REST APIs, HTML,",
+        "CSS, Tailwind CSS",
+        "Databases: PostgreSQL, MongoDB, Mongoose, PL/pgSQL AI/ML: PyTorch, scikit-learn, BERT, Hugging Face,",
+        "β-VAE, NLP, TF-IDF, XGBoost, LSTM, GRU",
+        "Tools/APIs: Git, GitHub, JWT, Axios, Socket.IO, Vercel, Cloudinary, Gemini API, Google Maps/Leaflet",
+        "Frameworks & Libraries: SomeBrandNewLib",
+    ]
+    skills = skills_from_section(section)
+    assert skills[:5] == ["Python", "JavaScript", "C", "C++", "SQL"]
+    for expected in ["React", "Node.js", "Express", "REST API", "Tailwind CSS", "Mongoose", "PL/pgSQL",
+                     "scikit-learn", "Hugging Face", "β-VAE", "TF-IDF", "XGBoost", "GRU", "GitHub", "JWT",
+                     "Socket.IO", "Cloudinary", "Gemini API", "Google Maps API", "Leaflet", "SomeBrandNewLib"]:
+        assert expected in skills, expected
+    # group labels must not become skills
+    for label in ["Languages", "Web/Backend", "Databases", "AI/ML", "Tools/APIs", "Frameworks & Libraries"]:
+        assert label not in skills
+
+
+def test_skills_section_bullets_and_sentences():
+    skills = skills_from_section(["• Communication • Leadership", "- MS Excel; Tally", "I am a quick learner who loves to work in teams"])
+    assert skills == ["Communication", "Leadership", "MS Excel", "Tally"]
+
+
+def test_common_words_are_not_skills():
+    # "rest", "spring", "transformers" used to be aliases and matched ordinary sentences
+    assert find_skills("I helped the rest of the team in spring 2024 with power transformers.") == []
+
+
 def test_education_entries():
     edu = parse_cv(SAMPLE_CV)["fields"]["education"]["value"]
     assert [e["level"] for e in edu] == ["Bachelor", "HSC", "SSC"]
@@ -106,6 +137,26 @@ def test_sections_split_on_headings():
     sections = split_sections(["Name", "Education:", "BSc", "Skills", "Python"])
     assert sections["education"] == ["BSc"]
     assert sections["skills"] == ["Python"]
+
+
+def test_education_institution_line_before_degree():
+    # Layout where the institution and year come ABOVE each degree
+    edu = find_education([
+        "Sample University, Dhaka 2026",
+        "B.Sc. in Computer Science and Engineering CGPA: 3.40/4.00",
+        "Sample City College, Rajshahi 2021",
+        "HSC GPA: 5.00/5.00",
+        "Sample High School, Rajshahi 2019",
+        "SSC GPA: 5.00/5.00",
+    ])
+    assert [(e["level"], e["institution"], e["year"]) for e in edu] == [
+        ("Bachelor", "Sample University", 2026),
+        ("HSC", "Sample City College", 2021),
+        ("SSC", "Sample High School", 2019),
+    ]
+    assert edu[0]["subject"] == "Computer Science and Engineering"
+    assert edu[0]["degree"] == "B.Sc. in Computer Science and Engineering"
+    assert edu[0]["result"] == "CGPA: 3.40/4.00"
 
 
 def test_dakhil_and_alim_are_recognised():

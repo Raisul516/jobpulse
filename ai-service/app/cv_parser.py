@@ -105,6 +105,94 @@ def find_date_of_birth(text: str) -> str | None:
     return parse_date(m[2]) if m else None
 
 
+# Words used as group labels inside a skills section ("Languages:", "Web/Backend:", "AI/ML:", "Tools/APIs:")
+CATEGORY_WORDS = {
+    "languages", "language", "programming", "web", "backend", "back-end", "frontend", "front-end", "fullstack",
+    "full-stack", "full", "stack", "databases", "database", "db", "dbms", "ai", "ml", "tools", "tool", "apis", "api",
+    "frameworks", "framework", "libraries", "library", "cloud", "devops", "others", "other", "soft", "skills",
+    "skill", "technologies", "technology", "technical", "platforms", "platform", "mobile", "testing", "data",
+    "science", "design", "office", "operating", "systems", "os", "version", "control", "deployment", "concepts",
+    "core", "expertise", "competencies", "and", "&", "misc", "miscellaneous", "dev", "development", "software",
+    "hardware", "networking", "analytics", "visualization", "familiar", "with", "proficient", "in", "basic",
+    "intermediate", "advanced", "knowledge", "of", "spoken", "communication",
+}
+
+# canonical name for every spelling, lowercase -> "Node.js"
+_ALIASES = {spelling.lower(): name for name, aliases in SKILLS.items() for spelling in [name, *aliases]}
+
+
+def _is_label_token(token: str) -> bool:
+    if token in {"&", "+", "/"}:  # "Frameworks & Libraries"
+        return True
+    parts = [p for p in re.split(r"[/&\-+]", token.lower().strip("()")) if p]
+    return bool(parts) and all(p in CATEGORY_WORDS for p in parts)
+
+
+# Separators between skill items: commas, semicolons, pipes, bullet characters, and " - " bullets
+SKILL_SEPARATORS = r"[,;|•·●▪]|\s[-–]\s"
+
+
+def _join_skill_lines(lines: list[str]) -> str:
+    """A line break separates items, unless the line ends with a comma (a list wrapped onto the next line)."""
+    text = ""
+    for line in lines:
+        line = re.sub(r"^\s*[-–*•·●▪]\s*", "", line)  # leading bullet
+        if text and not re.search(r"[,;|]\s*$", text):
+            text += ","
+        text += " " + line
+    return text
+
+
+def _strip_group_labels(text: str) -> str:
+    """'Python, SQL Web/Backend: React' -> 'Python, SQL , React' (labels become separators)."""
+    out = []
+    for chunk in re.split(f"({SKILL_SEPARATORS})", text):
+        if ":" not in chunk:
+            out.append(chunk)
+            continue
+        pieces = chunk.split(":")
+        kept = []
+        for piece in pieces[:-1]:
+            tokens = piece.split()
+            # the label is the last few words before ":" ("SQL Web/Backend:" -> item "SQL", label "Web/Backend")
+            while tokens and _is_label_token(tokens[-1]):
+                tokens.pop()
+            kept.append(" ".join(tokens))
+        kept.append(pieces[-1])
+        out.append(" , ".join(kept))
+    return "".join(out)
+
+
+def skills_from_section(section_lines: list[str]) -> list[str]:
+    """Everything listed in the CV's own Skills section counts, even skills JobPulse doesn't know yet."""
+    text = _strip_group_labels(_join_skill_lines(section_lines))
+    found: list[str] = []
+    for raw in re.split(SKILL_SEPARATORS, text):
+        item = raw.strip(" .-–—*\t()")
+        if not item or len(item) > 40 or len(item.split()) > 4 or not re.search(r"[A-Za-zঀ-৿]", item):
+            continue
+        known = _ALIASES.get(item.lower())
+        if known:
+            found.append(known)
+        elif "/" in item:
+            # "C/C++" -> C, C++ ;  "Google Maps/Leaflet" -> Google Maps, Leaflet
+            for part in (p.strip() for p in item.split("/")):
+                if part:
+                    found.append(_ALIASES.get(part.lower(), part))
+        else:
+            found.append(item)
+    return found
+
+
+def _unique(items: list[str]) -> list[str]:
+    seen, result = set(), []
+    for item in items:
+        if item.lower() not in seen:
+            seen.add(item.lower())
+            result.append(item)
+    return result
+
+
 def find_skills(text: str) -> list[str]:
     lower = text.lower()
     found = []
@@ -143,16 +231,30 @@ def _degree_level(line: str) -> tuple[str, str] | None:
 
 
 def find_education(lines: list[str]) -> list[dict]:
-    """One entry per degree line, using the next few lines for institution / result / year."""
+    """One entry per degree line, plus the institution / result / year written next to it.
+
+    CVs use two layouts, so we check which one this CV uses:
+      institution first:  "BRAC University, Dhaka 2026"   then  "B.Sc. in CSE  CGPA: 3.50"
+      degree first:       "B.Sc. in CSE"                  then  "Sample University, 2023"
+    """
     entries = []
     degree_rows = [i for i, line in enumerate(lines) if _degree_level(line)]
+    institution_first = bool(degree_rows) and any(INSTITUTION.search(line) for line in lines[: degree_rows[0]])
+
     for n, i in enumerate(degree_rows):
-        end = degree_rows[n + 1] if n + 1 < len(degree_rows) else min(len(lines), i + 4)
-        block = "\n".join(lines[i:min(end, i + 4)])
+        if institution_first:
+            start = degree_rows[n - 1] + 1 if n > 0 else max(0, i - 3)
+            block = "\n".join(lines[start : i + 1])
+        else:
+            end = degree_rows[n + 1] if n + 1 < len(degree_rows) else min(len(lines), i + 4)
+            block = "\n".join(lines[i : min(end, i + 4)])
         level, degree_text = _degree_level(lines[i])
 
         subject = None
-        if m := re.search(r"\bin\s+([A-Za-z&,.\s]{3,60}?)(?=\s*(\(|,|;|\||-|from|at|\d|$))", lines[i], re.I):
+        # "in Computer Science and Engineering" — stop before the result, a bracket, a year, etc.
+        if m := re.search(
+            r"\bin\s+([A-Za-z&,.\s]{3,60}?)(?=\s*(\(|,|;|\||\s-\s|from\b|at\b|c?gpa|result|\d|$))", lines[i], re.I
+        ):
             subject = m[1].strip(" ,.")
         elif m := re.search(r"\(([A-Z&]{2,6})\)", lines[i]):  # "BSc (CSE)"
             subject = m[1]
@@ -169,7 +271,8 @@ def find_education(lines: list[str]) -> list[dict]:
         entries.append(
             {
                 "level": level,
-                "degree": lines[i].strip()[:120] or degree_text,
+                # the degree line without its result ("B.Sc. in CSE CGPA: 3.09/4.00" -> "B.Sc. in CSE")
+                "degree": (RESULT.sub("", lines[i]).strip(" ,;|-–:") or degree_text)[:120],
                 "subject": subject,
                 "institution": institution,
                 "result": result,
@@ -226,7 +329,8 @@ def parse_cv(text: str, today: date | None = None) -> dict:
     fields = {
         "fullName": field(find_name(lines)),
         "dateOfBirth": field(find_date_of_birth(full_text)),
-        "skills": field(find_skills(full_text)),
+        # The CV's own Skills section first (in the CV's order), then known skills mentioned anywhere else
+        "skills": field(_unique(skills_from_section(sections.get("skills", [])) + find_skills(full_text))[:100]),
         "education": field(education),
         "experienceYears": field(experience_years),
         "summary": field(summary),
