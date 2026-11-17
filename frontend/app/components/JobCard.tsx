@@ -2,6 +2,7 @@ import Link from "next/link";
 import { STATUS_LABELS } from "../lib/saved";
 import { Job } from "../types/job";
 import DeadlineBadge from "./DeadlineBadge";
+import EligibilityBadge from "./EligibilityBadge";
 import MatchBadge from "./MatchBadge";
 
 type JobCardProps = {
@@ -58,8 +59,9 @@ export default function JobCard({ job, onToggleSave, busy }: JobCardProps) {
       </p>
       <p className="text-sm">Salary: {formatSalary(job.salaryMin, job.salaryMax)}</p>
       {job.match ? (
-        <div className="mt-2">
+        <div className="mt-2 flex flex-wrap items-start gap-x-3 gap-y-1">
           <MatchBadge match={job.match} />
+          {job.match.eligibility ? <EligibilityBadge eligibility={job.match.eligibility} /> : null}
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-3 mt-3">

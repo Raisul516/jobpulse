@@ -26,4 +26,12 @@ export type MatchResult = {
   passesFilters: boolean;
   isMatch: boolean;
   reasons: { text: string; good: boolean }[];
+  eligibility: Eligibility | null; // null = no confirmed CV profile
+};
+
+// The job's mandatory requirements checked against your profile (backend/src/lib/eligibility.ts)
+export type EligibilityStatus = "pass" | "fail" | "unknown";
+export type Eligibility = {
+  status: EligibilityStatus | "none"; // none = no requirements found in the job text
+  checks: { requirement: string; status: EligibilityStatus; reason: string }[];
 };

@@ -69,6 +69,13 @@ Free and private: no AI API, nothing leaves the computer.
 - **Filters are separate from the score**: a job that fails a filter is never a match, whatever its score.
 - The score is a weighted average of the parts you have: your keywords (40%), similarity to your CV (35%), your CV skills found in the job (25%). Keyword in the title = 70, each extra title keyword +15, each description-only keyword +5. CV similarity: cosine 0.2 → 0%, 0.6 → 100% (starting calibration). See `backend/src/lib/matching.ts`.
 
+### Eligibility (pass / fail / unknown)
+
+With a confirmed CV profile, every job gets `match.eligibility`: mandatory requirements read from the job text by rules (`backend/src/lib/eligibility.ts`) — age limit (checked on the circular's "as on" date, else the deadline), minimum education level, subject, CGPA (4.00 scale), years of experience — each checked against your profile.
+- `fail` blocks a match whatever the score; `unknown` (e.g. no date of birth, degree still in progress) is shown but doesn't block.
+- "preferred / is a plus / advantage" sentences are ignored; "fresh graduates may apply" removes the experience requirement.
+- Always confirm in the original circular: this is read automatically.
+
 ### Automatic sources (web page: http://localhost:3000/sources)
 
 JobPulse checks company career pages on **SmartRecruiters, Greenhouse and Lever** through their public job APIs — 10 seconds after the backend starts, then every 3 hours (`COLLECT_INTERVAL_HOURS` to change, `COLLECT_DISABLED=1` to turn off).

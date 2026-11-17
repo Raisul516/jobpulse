@@ -1,3 +1,5 @@
+import type { Eligibility } from "./eligibility";
+
 // Simple, explainable job matching (no AI yet — that comes later and will add to this, not replace it).
 //
 // Two separate questions, on purpose:
@@ -29,8 +31,9 @@ export type MatchableJob = {
 export type MatchResult = {
   score: number; // 0–100 relevance
   passesFilters: boolean;
-  isMatch: boolean; // passes filters AND score >= threshold
+  isMatch: boolean; // passes filters AND score >= threshold AND not ineligible
   reasons: { text: string; good: boolean }[];
+  eligibility: Eligibility | null; // null = no confirmed CV profile to check against
 };
 
 // Whole-word match for English ("java" must not match "javascript"); plain "contains" for Bangla,
@@ -54,6 +57,7 @@ const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().t
 export type CvSignals = {
   skills: string[];
   similarity: number | null; // cosine similarity between your profile and this job, or null if not computed yet
+  eligibility?: Eligibility; // mandatory requirements checked against your profile
 };
 
 export function matchJob(job: MatchableJob, prefs: Preferences, cv?: CvSignals): MatchResult {
@@ -135,7 +139,18 @@ export function matchJob(job: MatchableJob, prefs: Preferences, cv?: CvSignals):
   const totalWeight = parts.reduce((sum, p) => sum + p.weight, 0);
   const score = totalWeight ? roundHalfUp(parts.reduce((sum, p) => sum + p.score * p.weight, 0) / totalWeight) : 100;
 
-  return { score, passesFilters, isMatch: passesFilters && score >= prefs.matchThreshold, reasons };
+  // Eligibility is NOT part of the score: a clear "fail" blocks the match whatever the score.
+  // ("unknown" doesn't block — it's shown so you can check yourself.)
+  const eligibility = cv?.eligibility ?? null;
+  const eligible = eligibility?.status !== "fail";
+
+  return {
+    score,
+    passesFilters,
+    isMatch: passesFilters && eligible && score >= prefs.matchThreshold,
+    reasons,
+    eligibility,
+  };
 }
 
 // Decimal maths in computers is slightly off (87.5 can come out as 87.4999…); the tiny nudge makes .5 round up as expected.

@@ -129,6 +129,16 @@ describe("matchJob", () => {
     expect(r.score).toBe(55); // only CV skills: 1 hit -> 55
   });
 
+  it("an eligibility fail blocks the match even with a perfect score; unknown does not", () => {
+    const fail = { status: "fail" as const, checks: [{ requirement: "Age up to 24", status: "fail" as const, reason: "You are 25" }] };
+    const unknown = { status: "unknown" as const, checks: [] };
+    const blocked = matchJob(job, prefs, { skills: [], similarity: 0.9, eligibility: fail });
+    expect(blocked.score).toBe(100);
+    expect(blocked.isMatch).toBe(false);
+    expect(blocked.eligibility).toBe(fail);
+    expect(matchJob(job, prefs, { skills: [], similarity: 0.9, eligibility: unknown }).isMatch).toBe(true);
+  });
+
   it("filters still win over a strong CV match", () => {
     const r = matchJob(job, { ...prefs, locations: ["Sylhet"] }, { skills: ["React"], similarity: 0.9 });
     expect(r.isMatch).toBe(false);

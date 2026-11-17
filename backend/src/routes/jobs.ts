@@ -2,6 +2,7 @@ import { Router } from "express";
 import { currentUserId } from "../lib/currentUser";
 import { findPossibleDuplicates } from "../lib/importQueries";
 import { findJobById, findJobs, findLocations } from "../lib/jobQueries";
+import { checkEligibility, extractRequirements } from "../lib/eligibility";
 import { similarities } from "../lib/jobEmbeddings";
 import { matchJob, Preferences } from "../lib/matching";
 import { getPreferences } from "../lib/preferences";
@@ -74,7 +75,22 @@ jobsRouter.get("/", async (req, res) => {
   let result = jobs.map((job) => ({
     ...job,
     match: prefs
-      ? matchJob(job, prefs, profile ? { skills: profile.skills, similarity: similarity.get(job.id) ?? null } : undefined)
+      ? matchJob(
+          job,
+          prefs,
+          profile
+            ? {
+                skills: profile.skills,
+                similarity: similarity.get(job.id) ?? null,
+                // the job's mandatory requirements, checked against your confirmed profile
+                eligibility: checkEligibility(extractRequirements(`${job.title}
+${job.description ?? ""}`), profile, {
+                  deadline: job.deadline,
+                  isGovernment: job.category === "Government",
+                }),
+              }
+            : undefined
+        )
       : null,
   }));
 

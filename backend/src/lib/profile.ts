@@ -34,7 +34,13 @@ export async function getProfile(userId: number) {
 // The numbers used for matching, kept separate so they're never sent to the browser.
 export async function getProfileForMatching(userId: number) {
   const [row] = await db
-    .select({ skills: userProfiles.skills, embedding: userProfiles.embedding })
+    .select({
+      skills: userProfiles.skills,
+      embedding: userProfiles.embedding,
+      dateOfBirth: userProfiles.dateOfBirth,
+      education: userProfiles.education,
+      experienceYears: userProfiles.experienceYears,
+    })
     .from(userProfiles)
     .where(eq(userProfiles.userId, userId));
   return row ?? null;

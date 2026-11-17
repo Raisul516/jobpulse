@@ -2,14 +2,17 @@
 import { MatchResult } from "../types/job";
 
 export default function MatchBadge({ match }: { match: MatchResult }) {
+  const ineligible = match.eligibility?.status === "fail";
   const label = match.isMatch
     ? `Match ${match.score}%`
-    : match.passesFilters
-      ? `${match.score}% — below your threshold`
-      : "Doesn't fit your filters";
+    : !match.passesFilters
+      ? "Doesn't fit your filters"
+      : ineligible
+        ? `${match.score}% — but not eligible`
+        : `${match.score}% — below your threshold`;
   const color = match.isMatch
     ? "bg-green-100 text-green-800 border-green-300"
-    : match.passesFilters
+    : match.passesFilters && !ineligible
       ? "bg-gray-100 text-gray-700 border-gray-300"
       : "bg-orange-100 text-orange-800 border-orange-300";
 
