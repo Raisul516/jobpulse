@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   partialPrefetching: true,
+  // Deployed: the browser calls /api/... on the website itself and it's forwarded to the backend
+  // (BACKEND_URL, e.g. https://jobpulse-api.onrender.com). Locally it defaults to the backend on port 4000.
+  async rewrites() {
+    const backend = (process.env.BACKEND_URL ?? "http://localhost:4000").replace(/\/+$/, "");
+    return [{ source: "/api/:path*", destination: `${backend}/api/:path*` }];
+  },
   // Security headers (from the Next.js PWA guide). The service worker must never be cached,
   // otherwise a fixed sw.js would take days to reach your phone.
   async headers() {

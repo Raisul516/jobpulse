@@ -1,7 +1,12 @@
 // Everything the frontend needs to talk to the backend API.
 import { JobCategory, JobType } from "../types/job";
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+// Where the backend API is.
+// - `npm run dev`: straight to the backend on this computer.
+// - Deployed (production build): same address as the website ("/api/..."); the website forwards
+//   it to the backend (see rewrites in next.config.ts), so the login cookie stays first-party.
+export const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "" : "http://localhost:4000");
 
 export type FoundBy = "structured" | "meta" | "text";
 type Field<T> = { value: T; foundBy: FoundBy };

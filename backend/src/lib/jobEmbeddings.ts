@@ -65,5 +65,6 @@ export async function similarities(profileEmbedding: number[], jobIds: number[])
 export function startEmbeddingTimer(): void {
   const run = () => void embedMissingJobs();
   setTimeout(run, 5_000).unref();
-  setInterval(run, 10 * 60 * 1000).unref(); // every 10 minutes
+  // every 10 minutes (EMBED_INTERVAL_MINUTES changes it; new collected jobs are embedded right away anyway)
+  setInterval(run, (Number(process.env.EMBED_INTERVAL_MINUTES) || 10) * 60 * 1000).unref();
 }

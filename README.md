@@ -44,6 +44,24 @@ Personal job-intelligence and alert app for Bangladesh. See [documentation/roadm
   `docker exec jobplse-db-1 psql -U jobpulse -d jobpulse -c "UPDATE users SET password_hash=NULL WHERE id=1; DELETE FROM sessions;"`
 - When deployed behind HTTPS, set `NODE_ENV=production` (or `COOKIE_SECURE=true`) in `backend/.env` so the cookie is only sent over HTTPS.
 
+## Deploy (free)
+
+| Part | Where | Notes |
+|---|---|---|
+| Database | [Neon](https://neon.tech) (free) | Postgres with pgvector + pg_trgm. Use the **pooled** connection string. |
+| AI service | [Hugging Face Spaces](https://huggingface.co/spaces) (free CPU, Docker) | `ai-service/Dockerfile`. Copied there by `.github/workflows/deploy-ai-space.yml`. |
+| Backend | [Render](https://render.com) (free) | `render.yaml` blueprint. Runs migrations on every start. |
+| Website | [Vercel](https://vercel.com) (free) | Root directory `frontend`, env `BACKEND_URL`. `/api/*` is forwarded to the backend, so the login cookie stays on the website's own address. |
+| Keep awake | GitHub Actions | `.github/workflows/keep-awake.yml` pings the backend and AI service every 10 minutes (free Render sleeps after 15 min). |
+
+Settings, in one place:
+- **Hugging Face Space** → Settings → Secrets: `AI_SERVICE_TOKEN` (any long random string).
+- **Render**: `DATABASE_URL` (Neon), `AI_SERVICE_URL` (`https://<hf-name>-<space-name>.hf.space`), `AI_SERVICE_TOKEN` (same string), `VAPID_*` (same as `backend/.env`).
+- **Vercel**: `BACKEND_URL` = the Render address (`https://jobpulse-api.onrender.com`).
+- **GitHub repo** → Settings → Secrets and variables → Actions: variables `BACKEND_URL`, `AI_SERVICE_URL`, `HF_SPACE` (`<hf-name>/<space-name>`), secret `HF_TOKEN` (Hugging Face token with write access).
+
+Limits of the free setup: the first request after a sleep can take ~1 minute; GitHub may pause scheduled workflows after 60 days without commits (re-enable in the Actions tab).
+
 ## Useful backend commands
 
 | Command | Does |

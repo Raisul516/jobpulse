@@ -2,6 +2,8 @@
 import { EMBEDDING_DIMENSIONS } from "../db/schema";
 
 const BASE_URL = process.env.AI_SERVICE_URL ?? "http://127.0.0.1:8000";
+// When the ai-service runs on the internet (deployed), both sides share this secret so nobody else can use it.
+const TOKEN = process.env.AI_SERVICE_TOKEN ?? "";
 
 export class AiServiceError extends Error {
   constructor(message: string, public status = 502) {
@@ -12,7 +14,9 @@ export class AiServiceError extends Error {
 async function call<T>(path: string, init: RequestInit, timeoutMs: number): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${BASE_URL}${path}`, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    const headers = new Headers(init.headers);
+    if (TOKEN) headers.set("Authorization", `Bearer ${TOKEN}`);
+    response = await fetch(`${BASE_URL}${path}`, { ...init, headers, signal: AbortSignal.timeout(timeoutMs) });
   } catch {
     throw new AiServiceError("The AI service is not running. Start it (see README) and try again.", 503);
   }

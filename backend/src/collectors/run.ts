@@ -315,8 +315,36 @@ export async function runAllSources(): Promise<void> {
 
 const HOURS = Number(process.env.COLLECT_INTERVAL_HOURS) || 3;
 
+// Run only the sources whose last run is older than HOURS. Because the time comes from the
+// database, a server restart (or a free host waking up from sleep) doesn't trigger extra runs.
+export async function runDueSources(): Promise<void> {
+  const due = await db
+    .select({ id: jobSources.id, name: jobSources.name })
+    .from(jobSources)
+    .where(
+      and(
+        eq(jobSources.enabled, true),
+        sql`${jobSources.adapter} <> 'manual'`,
+        sql`(${jobSources.lastRunAt} IS NULL OR ${jobSources.lastRunAt} < now() - make_interval(hours => ${HOURS}))`
+      )
+    );
+  for (const source of due) {
+    const result = await runSource(source.id);
+    console.log(`[collect] ${source.name}: ${result.message}`);
+  }
+  if (due.length > 0) void embedMissingJobs();
+}
+
+let roundInProgress = false;
+
 export function startCollectorTimer(): void {
-  const run = () => runAllSources().catch((err) => console.error("[collect] failed:", err));
-  setTimeout(run, 10_000).unref(); // first run shortly after the server starts
-  setInterval(run, HOURS * 60 * 60 * 1000).unref();
+  const run = () => {
+    if (roundInProgress) return; // the previous round is still going
+    roundInProgress = true;
+    runDueSources()
+      .catch((err) => console.error("[collect] failed:", err))
+      .finally(() => (roundInProgress = false));
+  };
+  setTimeout(run, 10_000).unref(); // first check shortly after the server starts
+  setInterval(run, 30 * 60 * 1000).unref(); // then check every 30 minutes which sources are due
 }

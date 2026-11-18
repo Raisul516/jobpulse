@@ -1,0 +1,30 @@
+# The free backend (Render) falls asleep after 15 minutes without visitors, and then its timers
+# (collecting jobs, notifications) stop. This pings it every 10 minutes so it stays awake,
+# and pings the AI service (Hugging Face) so it doesn't sleep either.
+# Set the repository variables BACKEND_URL and AI_SERVICE_URL (Settings -> Secrets and variables
+# -> Actions -> Variables). Without them this does nothing.
+name: Keep awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping backend and AI service
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+          AI_SERVICE_URL: ${{ vars.AI_SERVICE_URL }}
+        run: |
+          if [ -n "$BACKEND_URL" ]; then
+            curl -fsS --max-time 90 --retry 2 "${BACKEND_URL%/}/api/health" || echo "backend did not answer"
+          fi
+          if [ -n "$AI_SERVICE_URL" ]; then
+            curl -fsS --max-time 90 --retry 2 "${AI_SERVICE_URL%/}/health" || echo "AI service did not answer"
+          fi

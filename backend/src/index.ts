@@ -20,9 +20,14 @@ const app = express();
 // 4000 matches the frontend's default NEXT_PUBLIC_API_URL.
 const port = Number(process.env.PORT) || 4000;
 
+// When deployed, requests pass through proxies (the website host, then the API host's load balancer).
+// TRUST_PROXY = how many, so req.ip is the visitor's address (used by the login rate limit).
+if (process.env.TRUST_PROXY) app.set("trust proxy", Number(process.env.TRUST_PROXY));
+
 app.use(
   cors({
-    // the website may be opened as localhost or 127.0.0.1 — both are this computer
+    // the website may be opened as localhost or 127.0.0.1 — both are this computer.
+    // Deployed, the website forwards /api to here (same address), so no extra origin is needed.
     origin: ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     credentials: true, // let the website send the login cookie
@@ -72,5 +77,5 @@ app.listen(port, () => {
   startNotifierTimer(); // push notifications for new matches and close deadlines
   // Collect from company career pages every few hours. Set COLLECT_DISABLED=1 to turn off (e.g. while testing).
   if (!process.env.COLLECT_DISABLED) startCollectorTimer();
-  console.log(`JobPulse API listening on http://localhost:${port}`);
+  console.log(`JobPulse API listening on port ${port}`);
 });

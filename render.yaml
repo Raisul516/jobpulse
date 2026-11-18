@@ -1,0 +1,34 @@
+# Render blueprint for the JobPulse backend (free plan).
+# Render -> New -> Blueprint -> pick this repo. It asks for the values marked sync: false.
+services:
+  - type: web
+    name: jobpulse-api
+    runtime: node
+    plan: free
+    region: singapore # closest to Bangladesh
+    rootDir: backend
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run start:prod # applies new database migrations, then starts the API
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production # also makes the login cookie HTTPS-only
+      - key: NODE_VERSION
+        value: "22"
+      - key: TRUST_PROXY
+        value: "2" # Vercel + Render's load balancer
+      - key: EMBED_INTERVAL_MINUTES
+        value: "30"
+      - key: DATABASE_URL # from Neon (the "pooled" connection string)
+        sync: false
+      - key: AI_SERVICE_URL # e.g. https://<your-name>-jobpulse-ai.hf.space
+        sync: false
+      - key: AI_SERVICE_TOKEN # same secret as on the Hugging Face Space
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false

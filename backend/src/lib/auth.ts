@@ -112,22 +112,35 @@ export async function checkLogin(email: string, password: string): Promise<numbe
 }
 
 // ---------- brute-force protection ----------
-// Max 10 failed logins per address per 15 minutes (kept in memory; resets when the server restarts).
+// Max 10 failed logins per address per 15 minutes, and max 50 in total from everyone
+// (kept in memory; resets when the server restarts). The total cap matters on a host behind
+// proxies, where the visitor's address can be faked: guessing stays far too slow either way.
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_FAILURES = 10;
+const MAX_TOTAL_FAILURES = 50;
+const TOTAL = "*all*";
 const failures = new Map<string, { count: number; resetAt: number }>();
 
-export function loginBlocked(ip: string): number {
-  const entry = failures.get(ip);
+function minutesBlocked(key: string, max: number): number {
+  const entry = failures.get(key);
   if (!entry || entry.resetAt < Date.now()) return 0;
-  return entry.count >= MAX_FAILURES ? Math.ceil((entry.resetAt - Date.now()) / 60_000) : 0;
+  return entry.count >= max ? Math.ceil((entry.resetAt - Date.now()) / 60_000) : 0;
+}
+
+export function loginBlocked(ip: string): number {
+  return Math.max(minutesBlocked(ip, MAX_FAILURES), minutesBlocked(TOTAL, MAX_TOTAL_FAILURES));
+}
+
+function bump(key: string): void {
+  const entry = failures.get(key);
+  if (!entry || entry.resetAt < Date.now()) failures.set(key, { count: 1, resetAt: Date.now() + WINDOW_MS });
+  else entry.count++;
 }
 
 export function recordFailure(ip: string): void {
-  const entry = failures.get(ip);
-  if (!entry || entry.resetAt < Date.now()) failures.set(ip, { count: 1, resetAt: Date.now() + WINDOW_MS });
-  else entry.count++;
+  bump(ip);
+  bump(TOTAL);
 }
 
 export function clearFailures(ip: string): void {
