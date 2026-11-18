@@ -1,5 +1,7 @@
 # JobPulse
 
+[![CI](https://github.com/Raisul516/jobpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/Raisul516/jobpulse/actions/workflows/ci.yml)
+
 Personal job-intelligence and alert app for Bangladesh. See [documentation/roadmap.md](documentation/roadmap.md) for the plan.
 
 | Folder | What it is |
