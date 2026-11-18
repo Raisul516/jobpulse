@@ -6,3 +6,6 @@ dist/
 !.env.example
 __pycache__/
 .venv/
+
+# Claude Code local settings
+.claude/
