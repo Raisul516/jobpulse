@@ -1,4 +1,8 @@
+import { asc, eq, sql } from "drizzle-orm";
 import { Router } from "express";
+import { db } from "../db/client";
+import { jobSourceRecords, jobSources } from "../db/schema";
+import { extractRequirements } from "../lib/eligibility";
 import { currentUserId } from "../lib/currentUser";
 import { findPossibleDuplicates } from "../lib/importQueries";
 import { findJobById, findJobs, findLocations } from "../lib/jobQueries";
@@ -91,11 +95,30 @@ jobsRouter.get("/:id", async (req, res) => {
     return;
   }
 
-  const job = await findJobById(id, await currentUserId());
+  const userId = await currentUserId();
+  const job = await findJobById(id, userId);
   if (!job) {
     res.status(404).json({ error: "Job not found" });
     return;
   }
 
-  res.json({ job });
+  // Same match + eligibility as the job list, plus what the detail page needs:
+  // the requirements JobPulse read from the text, and every site this vacancy was found on.
+  const [withMatch] = (await addMatches(userId, [job])).jobs;
+  const requirements = extractRequirements(`${job.title}\n${job.description ?? ""}`);
+  const sources = await db
+    .select({
+      name: jobSources.name,
+      adapter: jobSources.adapter,
+      url: jobSourceRecords.sourceUrl,
+      firstSeen: jobSourceRecords.fetchedAt,
+      lastSeen: jobSourceRecords.lastSeenAt,
+      removed: sql<boolean>`${jobSourceRecords.removedAt} IS NOT NULL`,
+    })
+    .from(jobSourceRecords)
+    .innerJoin(jobSources, eq(jobSources.id, jobSourceRecords.sourceId))
+    .where(eq(jobSourceRecords.jobId, id))
+    .orderBy(asc(jobSourceRecords.fetchedAt));
+
+  res.json({ job: withMatch, requirements, sources });
 });

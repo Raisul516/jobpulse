@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import NavBar from "./components/NavBar";
 import "./globals.css";
 
@@ -25,7 +26,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <NavBar />
+        {/* NavBar reads the current address (usePathname), which Next.js wants inside <Suspense>;
+            the fallback is an empty bar of the same height so nothing jumps */}
+        <Suspense fallback={<div className="h-[53px] border-b border-line bg-surface/80" />}>
+          <NavBar />
+        </Suspense>
         {children}
       </body>
     </html>

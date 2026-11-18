@@ -81,7 +81,11 @@ export default function JobCard({ job, onToggleSave, busy }: JobCardProps) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
-              <h2 className="text-lg font-semibold leading-snug">{job.title}</h2>
+              <h2 className="text-lg font-semibold leading-snug">
+                <Link href={`/jobs/${job.id}`} className="hover:text-brand hover:underline underline-offset-4">
+                  {job.title}
+                </Link>
+              </h2>
               <p className="flex items-center gap-1.5 text-sm text-muted">
                 <Building2 size={14} aria-hidden />
                 {job.company}
