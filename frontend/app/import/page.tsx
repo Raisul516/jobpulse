@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { api, ApiError, JobImport } from "../lib/api";
+import DuplicatePairs from "./DuplicatePairs";
 import ReviewForm from "./ReviewForm";
 
 export default function ImportPage() {
@@ -89,7 +90,7 @@ export default function ImportPage() {
         </button>
       </form>
 
-      {error ? <p className="text-red-600">{error}</p> : null}
+      {error ? <p className="alert alert-error">{error}</p> : null}
       {message ? <p className="alert alert-success">{message}</p> : null}
 
       {current ? <ReviewForm key={current.id} item={current} onDone={finished} /> : null}
@@ -115,6 +116,8 @@ export default function ImportPage() {
           </ul>
         </section>
       ) : null}
+
+      <DuplicatePairs />
     </main>
   );
 }

@@ -263,6 +263,24 @@ export const userPreferences = pgTable("user_preferences", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ---------- Duplicate review ----------
+
+// Pairs of jobs the user said are NOT the same vacancy, so they aren't suggested again.
+// Stored with the smaller id first.
+export const duplicateDismissals = pgTable(
+  "duplicate_dismissals",
+  {
+    jobAId: integer("job_a_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    jobBId: integer("job_b_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.jobAId, t.jobBId] })]
+);
+
 // ---------- Saved jobs / application tracking ----------
 
 export const savedJobs = pgTable(

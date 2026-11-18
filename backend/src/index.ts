@@ -8,6 +8,7 @@ import { sourcesRouter } from "./routes/sources";
 import { preferencesRouter } from "./routes/preferences";
 import { profileRouter } from "./routes/profile";
 import { pushRouter } from "./routes/push";
+import { duplicatesRouter } from "./routes/duplicates";
 import { startNotifierTimer } from "./lib/notifier";
 import { startEmbeddingTimer } from "./lib/jobEmbeddings";
 import { startCollectorTimer } from "./collectors/run";
@@ -38,6 +39,7 @@ app.use("/api/sources", sourcesRouter);
 app.use("/api/preferences", preferencesRouter);
 app.use("/api/profile", profileRouter);
 app.use("/api/push", pushRouter);
+app.use("/api/duplicates", duplicatesRouter);
 
 // Unknown routes -> 404 JSON instead of an HTML page.
 app.use((_req, res) => {
