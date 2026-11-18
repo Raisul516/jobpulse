@@ -35,6 +35,15 @@ Personal job-intelligence and alert app for Bangladesh. See [documentation/roadm
 - `cd ai-service` → `.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000` (needed for CV upload and CV matching; everything else works without it)
 - AI service tests: `cd ai-service` → `.venv\Scripts\python -m pytest`
 
+## Login
+
+- The first time you open the site it asks you to **create your account** (email + password, at least 10 characters). Your existing CV, preferences and saved jobs are kept and linked to it. After that, sign-up is closed: it's a one-person app.
+- Passwords are stored as scrypt hashes. A login lasts 30 days in an HttpOnly cookie; only a hash of the session token is kept in the database.
+- 10 wrong passwords from one IP in 15 minutes → login is blocked for 15 minutes (restart the backend to clear it).
+- Forgot your password? Reset to the "create account" screen:
+  `docker exec jobplse-db-1 psql -U jobpulse -d jobpulse -c "UPDATE users SET password_hash=NULL WHERE id=1; DELETE FROM sessions;"`
+- When deployed behind HTTPS, set `NODE_ENV=production` (or `COOKIE_SECURE=true`) in `backend/.env` so the cookie is only sent over HTTPS.
+
 ## Useful backend commands
 
 | Command | Does |
@@ -48,7 +57,8 @@ Personal job-intelligence and alert app for Bangladesh. See [documentation/roadm
 
 ## API
 
-- `GET /api/health`
+- `GET /api/health` (open; every other `/api` route needs you to be logged in)
+- `GET /api/auth/status`, `POST /api/auth/setup`, `POST /api/auth/login`, `POST /api/auth/logout`
 - `GET /api/jobs?search=&location=&jobType=&category=&sort=` — `sort`: `newest`, `deadline`, `salary-high`, `salary-low`. Expired jobs are hidden.
 - `GET /api/jobs/locations`
 - `GET /api/jobs/similar?title=&company=` — open jobs that may be the same vacancy

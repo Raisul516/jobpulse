@@ -2,11 +2,12 @@
 
 // Top navigation shown on every page. "use client" because it reads the current URL
 // (usePathname) to highlight the page you're on, and opens/closes the phone menu.
-import { Bell, Briefcase, Link2, Menu, Rss, Settings2, User, X } from "lucide-react";
+import { Bell, Briefcase, Link2, LogOut, Menu, Rss, Settings2, User, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { api, UNAUTHORIZED_EVENT } from "../lib/api";
 
 const LINKS = [
   { href: "/", label: "Jobs", icon: Briefcase },
@@ -19,6 +20,15 @@ const LINKS = [
 export default function NavBar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  const router = useRouter();
+
+  async function logout() {
+    setOpen(false);
+    await api("/api/auth/logout", { method: "POST" }).catch(() => {});
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT)); // the login gate re-checks and shows the login form
+    router.push("/");
+  }
 
   const linkClass = (active: boolean) =>
     `flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
@@ -46,6 +56,9 @@ export default function NavBar() {
           <Link2 size={16} aria-hidden />
           Add from link
         </Link>
+        <button type="button" onClick={logout} className="btn btn-ghost btn-sm hidden lg:inline-flex" title="Log out" aria-label="Log out">
+          <LogOut size={16} aria-hidden />
+        </button>
 
         {/* phone / tablet */}
         <button
@@ -74,6 +87,10 @@ export default function NavBar() {
                 {label}
               </Link>
             ))}
+            <button type="button" onClick={logout} className={`${linkClass(false)} w-full`}>
+              <LogOut size={18} aria-hidden />
+              Log out
+            </button>
           </div>
         </div>
       ) : null}

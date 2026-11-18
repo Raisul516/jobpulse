@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import JobCard from "./components/JobCard";
-import { API_URL } from "./lib/api";
+import { apiFetch } from "./lib/api";
 import { saveJob, unsaveJob } from "./lib/saved";
 import { Job } from "./types/job";
 
@@ -77,8 +77,8 @@ function JobsPage() {
   if (category !== "All") params.set("category", category);
   if (sort !== "newest") params.set("sort", sort);
   if (matchesOnly) params.set("matchesOnly", "true");
-  const requestUrl = `${API_URL}/api/jobs?${params.toString()}`;
-  const requestKey = `${requestUrl}#${reloadKey}`; // reloadKey forces a retry with the same URL
+  const requestPath = `/api/jobs?${params.toString()}`;
+  const requestKey = `${requestPath}#${reloadKey}`; // reloadKey forces a retry with the same URL
 
   // "Loading" = the last finished request isn't the one we want now.
   const loading = result?.key !== requestKey;
@@ -89,7 +89,7 @@ function JobsPage() {
 
   // Load the location list once, from the jobs that actually exist.
   useEffect(() => {
-    fetch(`${API_URL}/api/jobs/locations`)
+    apiFetch("/api/jobs/locations")
       .then((response) => (response.ok ? response.json() : { locations: [] }))
       .then((body: { locations: string[] }) => setLocations(body.locations))
       .catch(() => setLocations([]));
@@ -103,7 +103,7 @@ function JobsPage() {
   useEffect(() => {
     const controller = new AbortController();
 
-    fetch(requestUrl, { signal: controller.signal })
+    apiFetch(requestPath, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) {
           throw new Error(`Request failed (${response.status})`);
@@ -124,7 +124,7 @@ function JobsPage() {
       });
 
     return () => controller.abort();
-  }, [requestUrl, requestKey]);
+  }, [requestPath, requestKey]);
 
   // Save / unsave a job, then update just that card (no need to reload the whole list).
   async function toggleSave(job: Job) {

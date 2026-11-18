@@ -3,7 +3,7 @@
 // "My profile": upload your CV, check what JobPulse read from it, and confirm.
 // Nothing from the CV is used for matching until you press "Confirm profile".
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
-import { API_URL, api, ApiError, FieldError } from "../lib/api";
+import { api, ApiError, apiFetch, FieldError } from "../lib/api";
 
 type Level = "PhD" | "Masters" | "Bachelor" | "Diploma" | "HSC" | "SSC";
 type Education = {
@@ -115,7 +115,7 @@ export default function ProfilePage() {
       // multipart upload: our api() helper only sends JSON, so use fetch directly here
       const data = new FormData();
       data.append("cv", file);
-      const response = await fetch(`${API_URL}/api/profile/cv`, { method: "POST", body: data });
+      const response = await apiFetch("/api/profile/cv", { method: "POST", body: data });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? `Upload failed (${response.status})`);
       const u = body.upload as Upload;

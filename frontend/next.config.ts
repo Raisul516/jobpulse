@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   /* config options here */
   experimental: {
     agentFeedback: true,
+    // Every page sits behind the login gate and loads its data in the browser, so pages can't
+    // render instantly from a prerendered shell. Only check pages that ask for it (export const instant).
+    instantInsights: { validationLevel: "manual-warning" },
   },
   cacheComponents: true,
   partialPrefetching: true,

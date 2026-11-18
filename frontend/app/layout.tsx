@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
+import AuthGate from "./components/AuthGate";
 import NavBar from "./components/NavBar";
 import "./globals.css";
 
@@ -31,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Suspense fallback={<div className="h-[53px] border-b border-line bg-surface/80" />}>
           <NavBar />
         </Suspense>
-        {children}
+        <AuthGate>{children}</AuthGate>
       </body>
     </html>
   );

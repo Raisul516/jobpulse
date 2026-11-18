@@ -48,11 +48,24 @@ export class ApiError extends Error {
   }
 }
 
+// The login gate (AuthGate) listens for this and shows the login page when a session runs out.
+export const UNAUTHORIZED_EVENT = "jobpulse:unauthorized";
+
+// Every request to the backend sends the login cookie. Use this instead of plain fetch().
+export function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${API_URL}${path}`, { ...init, credentials: "include" }).then((response) => {
+    if (response.status === 401 && !path.startsWith("/api/auth/")) {
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
+    return response;
+  });
+}
+
 // fetch + JSON + turn error responses into ApiError.
 export async function api<T>(path: string, options: { method?: string; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await apiFetch(path, {
       method: options.method ?? "GET",
       headers: options.body === undefined ? undefined : { "Content-Type": "application/json" },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),

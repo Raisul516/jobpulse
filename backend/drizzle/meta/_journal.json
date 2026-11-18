@@ -78,6 +78,13 @@
       "when": 1794994081572,
       "tag": "0010_duplicate_dismissals",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794994581141,
+      "tag": "0011_auth",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,8 @@ import { preferencesRouter } from "./routes/preferences";
 import { profileRouter } from "./routes/profile";
 import { pushRouter } from "./routes/push";
 import { duplicatesRouter } from "./routes/duplicates";
+import { authRouter, requireAuth } from "./routes/auth";
+import { deleteExpiredSessions } from "./lib/auth";
 import { startNotifierTimer } from "./lib/notifier";
 import { startEmbeddingTimer } from "./lib/jobEmbeddings";
 import { startCollectorTimer } from "./collectors/run";
@@ -23,6 +25,7 @@ app.use(
     // the website may be opened as localhost or 127.0.0.1 — both are this computer
     origin: ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    credentials: true, // let the website send the login cookie
   })
 );
 
@@ -31,6 +34,10 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use(express.json({ limit: "100kb" })); // read JSON request bodies
+
+// Login routes are open; everything after requireAuth needs a logged-in session.
+app.use("/api/auth", authRouter);
+app.use("/api", requireAuth);
 
 app.use("/api/jobs", jobsRouter);
 app.use("/api/imports", importsRouter);
@@ -60,6 +67,7 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 app.listen(port, () => {
   startExpiryTimer();
+  void deleteExpiredSessions().catch(() => {});
   startEmbeddingTimer(); // give jobs embeddings for CV matching (needs the ai-service running)
   startNotifierTimer(); // push notifications for new matches and close deadlines
   // Collect from company career pages every few hours. Set COLLECT_DISABLED=1 to turn off (e.g. while testing).
