@@ -7,5 +7,4 @@ dist/
 __pycache__/
 .venv/
 
-# Claude Code local settings
 .claude/
