@@ -12,12 +12,29 @@ export type CollectedJob = {
   jobTypeText?: string; // e.g. "Full-time", "permanent", "Intern"
   descriptionText: string; // plain text, used to find deadline and salary
   postedAt?: string;
+  // When the platform states these directly they're trusted over guesses from the text
+  deadline?: string; // "YYYY-MM-DD"
+  salaryMin?: number; // BDT per month
+  salaryMax?: number;
+  categoryHint?: "Government" | "Private" | "Bank" | "NGO" | "Internship";
 };
+
+// A posting we already have and didn't re-download (to spare the site extra requests):
+// only "still listed" is recorded for it.
+export type SeenJob = { externalId: string; unchanged: true };
 
 export type Collector = {
   label: string; // shown in the UI
-  // Read every open posting for one company. Throws if the platform can't be reached.
-  fetchJobs(companyKey: string): Promise<CollectedJob[]>;
-  // Recognise this platform from a careers-page link and return the company key, or null.
+  // false = the platform only shows the newest postings (e.g. bdjobs' first page), so a posting
+  // missing from the list does NOT mean it was taken down. Default true.
+  fullListing?: boolean;
+  // Read the open postings for one key (company / category). `known` = external IDs JobPulse already
+  // has, so a collector can skip downloading details for them. Throws if the platform can't be reached.
+  fetchJobs(key: string, known: Set<string>): Promise<(CollectedJob | SeenJob)[]>;
+  // Recognise this platform from a link and return its key, or null.
   keyFromUrl(url: URL): string | null;
 };
+
+export function isSeen(job: CollectedJob | SeenJob): job is SeenJob {
+  return "unchanged" in job;
+}

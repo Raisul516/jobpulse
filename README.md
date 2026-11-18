@@ -100,6 +100,10 @@ API:
 - `POST /api/sources/:id/run` — check now
 - `PATCH /api/sources/:id` `{ enabled?, defaultCategory? }`
 
+**bdjobs.com** (added 2026-11-18): pick categories on the Sources page. JobPulse reads the data bdjobs embeds in its **public** pages (`ng-state` JSON) — the newest-jobs list (1 request per run, cached 10 min) and the detail page of each NEW job in your categories (max 25 per run, 1.5 s apart). Only the newest 50 jobs are public, so bdjobs jobs are never closed for "disappearing" — they expire by deadline. Checked before building: robots.txt allows these pages; the Terms call bdjobs "a public site with free access". Personal use only, links always go back to bdjobs. bdjobs job links pasted on "Add from link" are read the same way.
+
+Not available (checked 2026-11-18): chakri.com was down (Cloudflare error 523), smartjob.portal.gov.bd didn't answer. Teletalk alljobs is on hold — its terms require written permission.
+
 To support another platform, add a file in `backend/src/collectors/` that implements `Collector` (see `types.ts`) and register it in `collectors/index.ts`.
 
 ### Saved jobs / application tracker (web page: http://localhost:3000/saved)

@@ -10,7 +10,9 @@ import { db } from "../db/client";
 import { jobSourceRecords, jobSources } from "../db/schema";
 import { COLLECTORS, detectPlatform } from "../collectors";
 import { CollectorError } from "../collectors/http";
+import { bdjobsList } from "../collectors/bdjobs";
 import { runSource } from "../collectors/run";
+import { CollectedJob, isSeen } from "../collectors/types";
 import { JOB_CATEGORIES } from "../types/job";
 
 export const sourcesRouter = Router();
@@ -64,6 +66,23 @@ sourcesRouter.get("/", async (_req, res) => {
   res.json({ sources, platforms: Object.values(COLLECTORS).map((c) => c.label) });
 });
 
+// GET /api/sources/bdjobs/categories -> bdjobs' job categories, for the picker on the Sources page
+sourcesRouter.get("/bdjobs/categories", async (_req, res) => {
+  try {
+    const { categories, items } = await bdjobsList();
+    const newest = new Map<number, number>();
+    for (const item of items) newest.set(Number(item.Cat_id), (newest.get(Number(item.Cat_id)) ?? 0) + 1);
+    // how many of the 50 newest jobs are in each category, as a hint of how busy it is
+    res.json({ categories: categories.map((c) => ({ ...c, newestCount: newest.get(c.id) ?? 0 })) });
+  } catch (err) {
+    if (err instanceof CollectorError) {
+      res.status(502).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+});
+
 sourcesRouter.post("/", async (req, res) => {
   const parsed = addSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -90,10 +109,24 @@ sourcesRouter.post("/", async (req, res) => {
     return;
   }
 
-  // Check the company really exists on that platform before saving it (and learn its name).
-  let preview;
+  // Check the source really works before saving it (and learn a name for it).
+  let previewCount: number;
+  let name: string;
   try {
-    preview = await COLLECTORS[platform.adapter].fetchJobs(platform.key);
+    if (platform.adapter === "bdjobs") {
+      // Only the list page: a full test run would download up to 25 job pages for nothing.
+      const { items, categories } = await bdjobsList();
+      const ids = platform.key === "all" ? null : platform.key.split(",").map(Number);
+      previewCount = ids ? items.filter((i) => ids.includes(Number(i.Cat_id))).length : items.length;
+      const names = ids ? categories.filter((c) => ids.includes(c.id)).map((c) => c.name) : ["all categories"];
+      name = parsed.data.name || names.join(", ") || platform.key;
+    } else {
+      const preview = (await COLLECTORS[platform.adapter].fetchJobs(platform.key, new Set())).filter(
+        (j): j is CollectedJob => !isSeen(j)
+      );
+      previewCount = preview.length;
+      name = parsed.data.name || preview.find((j) => j.company)?.company || platform.key;
+    }
   } catch (err) {
     if (err instanceof CollectorError) {
       res.status(400).json({ error: err.message });
@@ -102,12 +135,11 @@ sourcesRouter.post("/", async (req, res) => {
     throw err;
   }
 
-  const name = parsed.data.name || preview.find((j) => j.company)?.company || platform.key;
   const [created] = await db
     .insert(jobSources)
     .values({
       name: `${name} (${COLLECTORS[platform.adapter].label})`,
-      kind: "company",
+      kind: platform.adapter === "bdjobs" ? "portal" : "company",
       adapter: platform.adapter,
       externalKey: platform.key,
       baseUrl: parsed.data.url,
@@ -124,7 +156,7 @@ sourcesRouter.post("/", async (req, res) => {
   const [source] = await db.select(sourceColumns).from(jobSources).where(eq(jobSources.id, created.id));
   // Some platforms answer "0 jobs" even for a company ID that does not exist, so we can only warn.
   const warning =
-    preview.length === 0
+    previewCount === 0
       ? "No open jobs found right now. If you expected some, check that the link is the company's careers page."
       : undefined;
   res.status(201).json({ source, summary, warning });

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { JobCategory } from "../types/job";
+import BdjobsPicker from "./BdjobsPicker";
 
 type Source = {
   id: number;
@@ -118,7 +119,7 @@ export default function SourcesPage() {
       <div>
         <h1 className="page-title">Sources</h1>
         <p className="page-sub">
-          Companies whose career pages JobPulse checks automatically every 3 hours. New jobs are added to the{" "}
+          Job sites and company career pages JobPulse checks automatically every 3 hours. New jobs are added to the{" "}
           <Link href="/" className="link">
             job list
           </Link>
@@ -130,8 +131,15 @@ export default function SourcesPage() {
         </p>
       </div>
 
+      <BdjobsPicker
+        onAdded={(source, msg) => {
+          setSources((old) => [source as Source, ...(old ?? [])]);
+          setMessage(msg);
+        }}
+      />
+
       <form onSubmit={add} className="card p-5 space-y-3">
-        <h2 className="font-semibold">Add a company</h2>
+        <h2 className="font-semibold">Add a company career page</h2>
         <p className="text-sm">
           Paste a link to the company&apos;s careers page or any one of its job posts.
           {platforms.length ? ` Works for career pages on ${platforms.join(", ")}.` : ""}

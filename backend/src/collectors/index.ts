@@ -1,4 +1,5 @@
 // All supported platforms, and "which platform is this careers link from?"
+import { bdjobs } from "./bdjobs";
 import { greenhouse } from "./greenhouse";
 import { lever } from "./lever";
 import { smartRecruiters } from "./smartrecruiters";
@@ -8,6 +9,7 @@ export const COLLECTORS = {
   smartrecruiters: smartRecruiters,
   greenhouse,
   lever,
+  bdjobs,
 } satisfies Record<string, Collector>;
 
 export type CollectorName = keyof typeof COLLECTORS;

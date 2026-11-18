@@ -4,11 +4,25 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { jobs, jobSourceRecords, jobSources } from "../db/schema";
 import type { ExtractedJob } from "../types/extracted";
+import { readDetail } from "../collectors/bdjobs";
+import { toExtracted } from "../collectors/run";
 import { normalizeUrl } from "./normalizeUrl";
 import { parseJobPage } from "./parseJobPage";
 import { fetchPage, FetchPageError } from "./safeFetch";
 
 const MANUAL_SOURCE = "Manual link";
+
+// Sites whose pages embed their own job data: read that instead of guessing from the text.
+function readKnownSite(html: string, pageUrl: string): ExtractedJob | null {
+  const url = new URL(pageUrl);
+  const bdjobsId = /(^|\.)bdjobs\.com$/i.test(url.hostname) ? url.pathname.match(/\/details\/(\d+)/)?.[1] : undefined;
+  if (bdjobsId) {
+    const job = readDetail(html, bdjobsId);
+    // no category: bdjobs' categories don't say Private vs Government, so the user picks it on review
+    if (job) return toExtracted(job, { name: "", defaultCategory: null });
+  }
+  return null;
+}
 
 const importColumns = {
   id: jobSourceRecords.id,
@@ -65,7 +79,7 @@ export async function createImport(url: string): Promise<{ record: ImportRecord;
   try {
     const page = await fetchPage(normalized);
     html = page.html;
-    extracted = parseJobPage(page.html, page.finalUrl);
+    extracted = readKnownSite(page.html, page.finalUrl) ?? parseJobPage(page.html, page.finalUrl);
   } catch (err) {
     // Couldn't read the page (blocked, PDF, offline...). Keep the record so the user can fill it in by hand.
     if (!(err instanceof FetchPageError)) throw err;

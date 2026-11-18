@@ -17,7 +17,7 @@ import type { ExtractedJob } from "../types/extracted";
 import type { JobCategory, JobType } from "../types/job";
 import { COLLECTORS, CollectorName } from ".";
 import { CollectorError } from "./http";
-import type { CollectedJob } from "./types";
+import { CollectedJob, isSeen } from "./types";
 
 type Source = typeof jobSources.$inferSelect;
 
@@ -65,9 +65,12 @@ export function toExtracted(job: CollectedJob, source: Pick<Source, "name" | "de
       ? { value: typeFromText, foundBy: "text" }
       : { value: "Full-time", foundBy: "meta" };
 
+  // Category: internships are always "Internship"; otherwise what the platform tells us (bdjobs: Bank, NGO), else the source's default
   const category: JobCategory | undefined =
-    jobType.value === "Internship" ? "Internship" : (source.defaultCategory ?? undefined);
-  const salary = findSalaryInText(job.descriptionText);
+    jobType.value === "Internship" ? "Internship" : (job.categoryHint ?? source.defaultCategory ?? undefined);
+  // Salary and deadline: stated by the platform -> trusted; otherwise searched in the text
+  const textSalary = job.salaryMin || job.salaryMax ? undefined : findSalaryInText(job.descriptionText);
+  const textDeadline = job.deadline ? undefined : findDeadlineInText(job.descriptionText);
   // Source names look like "Acme Ltd (Lever)"; the company is the part before the platform.
   const companyFromSource = source.name.replace(/\s*\([^)]*\)\s*$/, "");
 
@@ -77,9 +80,9 @@ export function toExtracted(job: CollectedJob, source: Pick<Source, "name" | "de
     location: s(mapLocation(job)),
     jobType,
     category: category ? { value: category, foundBy: "meta" } : undefined,
-    deadline: t(findDeadlineInText(job.descriptionText)),
-    salaryMin: t(salary?.min),
-    salaryMax: t(salary?.max),
+    deadline: job.deadline ? s(job.deadline) : t(textDeadline),
+    salaryMin: job.salaryMin ? s(job.salaryMin) : t(textSalary?.min),
+    salaryMax: job.salaryMax ? s(job.salaryMax) : t(textSalary?.max),
     applyUrl: s(job.applyUrl ?? job.url),
     description: s(job.descriptionText.slice(0, MAX_DESCRIPTION) || undefined),
   };
@@ -124,13 +127,29 @@ export async function runSource(sourceId: number): Promise<RunSummary> {
 
   try {
     const collector = COLLECTORS[source.adapter as CollectorName];
-    const collected = await collector.fetchJobs(source.externalKey);
+    // Postings we already have: the collector may skip re-downloading them
+    const knownRows = await db
+      .select({ externalId: jobSourceRecords.externalId })
+      .from(jobSourceRecords)
+      .where(and(eq(jobSourceRecords.sourceId, source.id), sql`${jobSourceRecords.externalId} IS NOT NULL`));
+    const known = new Set(knownRows.map((r) => r.externalId!));
+
+    const collected = await collector.fetchJobs(source.externalKey, known);
     summary.found = collected.length;
 
     for (const job of collected) {
-      await syncOne(source, job, startedAt, summary);
+      if (isSeen(job)) {
+        // still listed, nothing re-downloaded: just remember we saw it
+        await db
+          .update(jobSourceRecords)
+          .set({ lastSeenAt: startedAt, removedAt: null })
+          .where(and(eq(jobSourceRecords.sourceId, source.id), eq(jobSourceRecords.externalId, job.externalId)));
+      } else {
+        await syncOne(source, job, startedAt, summary);
+      }
     }
-    summary.closed = await closeRemoved(source.id, startedAt);
+    // Only platforms that list EVERY open posting can tell us a posting was taken down
+    if (collector.fullListing !== false) summary.closed = await closeRemoved(source.id, startedAt);
     await expireOldJobs();
 
     summary.message =

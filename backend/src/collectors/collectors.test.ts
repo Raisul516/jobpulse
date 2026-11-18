@@ -15,7 +15,7 @@ describe("detectPlatform", () => {
     expect(detectPlatform(link)).toEqual({ adapter, key });
   });
 
-  it.each(["https://bdjobs.com/h/details/1", "https://example.com/careers", "not a link", "https://smartrecruiters.com.evil.example/x"])(
+  it.each(["https://chakri.com/jobs/1", "https://example.com/careers","not a link", "https://smartrecruiters.com.evil.example/x"])(
     "rejects %s",
     (link) => {
       expect(detectPlatform(link)).toBeNull();

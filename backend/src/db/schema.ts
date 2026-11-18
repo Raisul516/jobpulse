@@ -107,7 +107,7 @@ export const jobs = pgTable(
 
 // How JobPulse reads a source. "manual" = links the user pastes; the others are
 // recruitment platforms with a public job API that companies use for their career pages.
-export const sourceAdapterEnum = pgEnum("source_adapter", ["manual", "smartrecruiters", "greenhouse", "lever"]);
+export const sourceAdapterEnum = pgEnum("source_adapter", ["manual", "smartrecruiters", "greenhouse", "lever", "bdjobs"]);
 
 // A website or platform that jobs come from.
 export const jobSources = pgTable(

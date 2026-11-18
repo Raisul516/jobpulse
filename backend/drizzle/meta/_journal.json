@@ -64,6 +64,13 @@
       "when": 1794932070678,
       "tag": "0008_push_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794990237276,
+      "tag": "0009_bdjobs_adapter",
+      "breakpoints": true
     }
   ]
 }
