@@ -5,6 +5,8 @@ Only the Node backend calls this (never the browser directly), and it only liste
   GET  /health
   POST /parse-cv   multipart file  -> CV text + draft profile fields
   POST /embed      {"texts": [...]} -> one 384-number vector per text
+  POST /explain-match {job, profile, match} -> {text}           (needs LLM_API_KEY)
+  POST /ask           {question, jobs, profile} -> {answer, jobIds} (needs LLM_API_KEY)
 """
 
 import hmac
@@ -14,9 +16,14 @@ from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .cv_parser import parse_cv
-from .cv_text import CvReadError, extract_text
-from .embeddings import DIMENSIONS, MODEL_NAME, embed
+from .env import load_env
+
+load_env()  # ai-service/.env (LLM_API_KEY etc.), before anything reads the settings
+
+from .cv_parser import parse_cv  # noqa: E402
+from .cv_text import CvReadError, extract_text  # noqa: E402
+from .embeddings import DIMENSIONS, MODEL_NAME, embed  # noqa: E402
+from . import llm  # noqa: E402
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 # When deployed on the internet, set AI_SERVICE_TOKEN (same value as in the backend) so only
@@ -42,7 +49,7 @@ def root():
 
 @app.get("/health")
 def health():
-    return {"ok": True, "embeddingModel": MODEL_NAME, "dimensions": DIMENSIONS}
+    return {"ok": True, "embeddingModel": MODEL_NAME, "dimensions": DIMENSIONS, "llm": llm.model_name() if llm.is_configured() else None}
 
 
 @app.post("/parse-cv")
@@ -65,3 +72,34 @@ class EmbedRequest(BaseModel):
 @app.post("/embed")
 def embed_endpoint(body: EmbedRequest):
     return {"model": MODEL_NAME, "dimensions": DIMENSIONS, "vectors": embed(body.texts)}
+
+
+# ---------- RAG: the backend finds the jobs (retrieval), the LLM writes the text (generation) ----------
+
+
+class ExplainRequest(BaseModel):
+    job: dict
+    profile: dict | None = None
+    match: dict | None = None
+
+
+@app.post("/explain-match")
+def explain_match_endpoint(body: ExplainRequest):
+    try:
+        return {"text": llm.explain_match(body.job, body.profile, body.match), "model": llm.model_name()}
+    except llm.LlmError as err:
+        raise HTTPException(status_code=err.status, detail=str(err)) from err
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=2, max_length=500)
+    jobs: list[dict] = Field(max_length=12)
+    profile: dict | None = None
+
+
+@app.post("/ask")
+def ask_endpoint(body: AskRequest):
+    try:
+        return {**llm.answer_question(body.question, body.jobs, body.profile), "model": llm.model_name()}
+    except llm.LlmError as err:
+        raise HTTPException(status_code=err.status, detail=str(err)) from err

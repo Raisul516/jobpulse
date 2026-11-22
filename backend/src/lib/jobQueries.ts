@@ -92,3 +92,21 @@ export async function findLocations(): Promise<string[]> {
     .orderBy(asc(jobs.location));
   return rows.map((r) => r.location);
 }
+
+// RAG retrieval: the open jobs whose meaning is closest to this vector (e.g. a question), best first.
+export async function findJobsBySimilarity(vector: number[], userId: number, limit: number): Promise<Job[]> {
+  const literal = JSON.stringify(vector);
+  return db
+    .select(jobWithSavedColumns)
+    .from(jobs)
+    .leftJoin(savedJobs, mySavedRow(userId))
+    .where(
+      and(
+        eq(jobs.status, "open"),
+        or(isNull(jobs.deadline), gte(jobs.deadline, todayInDhaka)),
+        sql`${jobs.embedding} IS NOT NULL`
+      )
+    )
+    .orderBy(sql`${jobs.embedding} <=> ${literal}::vector`)
+    .limit(limit);
+}

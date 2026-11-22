@@ -55,12 +55,23 @@ Personal job-intelligence and alert app for Bangladesh. See [documentation/roadm
 | Keep awake | GitHub Actions | `.github/workflows/keep-awake.yml` pings the backend and AI service every 10 minutes (free Render sleeps after 15 min). |
 
 Settings, in one place:
-- **Hugging Face Space** → Settings → Secrets: `AI_SERVICE_TOKEN` (any long random string).
+- **Hugging Face Space** → Settings → Secrets: `AI_SERVICE_TOKEN` (any long random string) and `LLM_API_KEY` (your Gemini key, for the AI features).
 - **Render**: `DATABASE_URL` (Neon), `AI_SERVICE_URL` (`https://<hf-name>-<space-name>.hf.space`), `AI_SERVICE_TOKEN` (same string), `VAPID_*` (same as `backend/.env`).
 - **Vercel**: `BACKEND_URL` = the Render address (`https://jobpulse-api.onrender.com`).
 - **GitHub repo** → Settings → Secrets and variables → Actions: variables `BACKEND_URL`, `AI_SERVICE_URL`, `HF_SPACE` (`<hf-name>/<space-name>`), secret `HF_TOKEN` (Hugging Face token with write access).
 
 Limits of the free setup: the first request after a sleep can take ~1 minute; GitHub may pause scheduled workflows after 60 days without commits (re-enable in the Actions tab).
+
+## AI answers (RAG)
+
+JobPulse uses RAG (Retrieval-Augmented Generation): the backend **finds** the right facts in your own database (jobs closest in meaning via pgvector, your CV profile, the match and eligibility checks), and only those are given to an LLM, which **writes** the answer. The LLM never sees the rest of the database and may only recommend jobs it was given.
+
+- **Ask JobPulse** (http://localhost:3000/ask): ask in English, Bangla or Banglish, e.g. "Dhakay fresher der jonno kon software job ache?". Recommended jobs are shown under the answer.
+- **Explain with AI** on every job page: what in your CV matches, what's missing, and a tip for applying (cached, so asking again costs nothing).
+- Setup: get a free key at https://aistudio.google.com/apikey, copy `ai-service/.env.example` to `ai-service/.env` and set `LLM_API_KEY`, then restart the AI service. Without a key everything else still works; these two features say they are off.
+- Any OpenAI-compatible provider works (`LLM_BASE_URL`, `LLM_MODEL`), e.g. Groq.
+- Max 20 AI answers per 10 minutes, to stay inside free limits.
+- Privacy: the question, the job texts and your CV profile (skills, education, experience, summary — not your name or date of birth) are sent to the LLM provider. Free tiers may use data to improve their models.
 
 ## Useful backend commands
 
@@ -81,6 +92,11 @@ Limits of the free setup: the first request after a sleep can take ~1 minute; Gi
 - `GET /api/jobs/locations`
 - `GET /api/jobs/similar?title=&company=` — open jobs that may be the same vacancy
 - `GET /api/jobs/:id`
+
+### AI (RAG)
+
+- `POST /api/ai/ask` `{ question }` → `{ answer, model, recommended, jobs }`
+- `POST /api/ai/explain/:jobId` → `{ text, model, cached }`
 
 ### CV profile (web page: http://localhost:3000/profile)
 

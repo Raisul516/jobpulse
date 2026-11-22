@@ -24,7 +24,9 @@ async function call<T>(path: string, init: RequestInit, timeoutMs: number): Prom
   if (!response.ok) {
     // FastAPI puts its message in "detail"
     const detail = typeof body.detail === "string" ? body.detail : "The AI service could not handle this request.";
-    throw new AiServiceError(detail, response.status >= 500 ? 502 : 400);
+    // 429 = free LLM limit reached, 503 = LLM not set up: pass those on; other server errors -> 502
+    const status = response.status === 429 || response.status === 503 ? response.status : response.status >= 500 ? 502 : 400;
+    throw new AiServiceError(detail, status);
   }
   return body as T;
 }
@@ -62,4 +64,29 @@ export async function aiServiceIsUp(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ---------- RAG (the AI service asks the LLM; these need LLM_API_KEY there) ----------
+
+export type LlmProfile = {
+  skills: string[];
+  experienceYears: number | null;
+  education: unknown[];
+  summary: string | null;
+} | null;
+
+export function explainMatch(job: object, profile: LlmProfile, match: object | null): Promise<{ text: string; model: string }> {
+  return call("/explain-match", jsonPost({ job, profile, match }), 90_000);
+}
+
+export function askAboutJobs(
+  question: string,
+  jobs: object[],
+  profile: LlmProfile
+): Promise<{ answer: string; jobIds: number[]; model: string }> {
+  return call("/ask", jsonPost({ question, jobs, profile }), 90_000);
+}
+
+function jsonPost(body: unknown): RequestInit {
+  return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
 }

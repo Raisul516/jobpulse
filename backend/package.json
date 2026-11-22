@@ -12,7 +12,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --dir src",
     "start:prod": "node dist/db/migrate.js && node dist/index.js",
     "db:migrate:prod": "node dist/db/migrate.js"
   },

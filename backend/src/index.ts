@@ -10,6 +10,7 @@ import { profileRouter } from "./routes/profile";
 import { pushRouter } from "./routes/push";
 import { duplicatesRouter } from "./routes/duplicates";
 import { authRouter, requireAuth } from "./routes/auth";
+import { aiRouter } from "./routes/ai";
 import { deleteExpiredSessions } from "./lib/auth";
 import { startNotifierTimer } from "./lib/notifier";
 import { startEmbeddingTimer } from "./lib/jobEmbeddings";
@@ -52,6 +53,7 @@ app.use("/api/preferences", preferencesRouter);
 app.use("/api/profile", profileRouter);
 app.use("/api/push", pushRouter);
 app.use("/api/duplicates", duplicatesRouter);
+app.use("/api/ai", aiRouter);
 
 // Unknown routes -> 404 JSON instead of an HTML page.
 app.use((_req, res) => {

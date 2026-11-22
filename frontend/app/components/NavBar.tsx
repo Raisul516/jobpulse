@@ -2,7 +2,7 @@
 
 // Top navigation shown on every page. "use client" because it reads the current URL
 // (usePathname) to highlight the page you're on, and opens/closes the phone menu.
-import { Bell, Briefcase, Link2, LogOut, Menu, Rss, Settings2, User, X } from "lucide-react";
+import { Bell, Briefcase, Link2, LogOut, Menu, MessageCircleQuestion, Rss, Settings2, User, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -11,6 +11,7 @@ import { api, UNAUTHORIZED_EVENT } from "../lib/api";
 
 const LINKS = [
   { href: "/", label: "Jobs", icon: Briefcase },
+  { href: "/ask", label: "Ask AI", icon: MessageCircleQuestion },
   { href: "/saved", label: "Applications", icon: Bell },
   { href: "/profile", label: "My profile", icon: User },
   { href: "/preferences", label: "Preferences", icon: Settings2 },

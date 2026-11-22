@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Suspense, use, useEffect, useState } from "react";
+import AiExplain from "../../components/AiExplain";
 import DeadlineBadge from "../../components/DeadlineBadge";
 import { formatSalary } from "../../components/JobCard";
 import { api } from "../../lib/api";
@@ -223,6 +224,9 @@ function JobDetail({ params }: { params: Promise<{ id: string }> }) {
           </div>
         </section>
       ) : null}
+
+      {/* ----- AI explanation (RAG) ----- */}
+      <AiExplain jobId={job.id} />
 
       {/* ----- requirements as read ----- */}
       {reqLines.length ? (
