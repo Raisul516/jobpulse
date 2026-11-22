@@ -145,6 +145,7 @@ Free and private: no AI API, nothing leaves the computer.
 With a confirmed CV profile, every job gets `match.eligibility`: mandatory requirements read from the job text by rules (`backend/src/lib/eligibility.ts`) — age limit (checked on the circular's "as on" date, else the deadline), minimum education level, subject, CGPA (4.00 scale), years of experience — each checked against your profile.
 - `fail` blocks a match whatever the score; `unknown` (e.g. no date of birth, degree still in progress) is shown but doesn't block.
 - "preferred / is a plus / advantage" sentences are ignored; "fresh graduates may apply" removes the experience requirement.
+- **Experience is a big factor in the score.** Formats read: "At least 5 years", "2+ years", "1 to 2 years", "0-2 yrs", "৩ বছরের অভিজ্ঞতা", "6 months", and bdjobs' "Experience" heading with the years on the next line. If you have fewer years than the minimum, the whole score is cut: 1 year short ×0.6, 2 short ×0.35, 3–4 short ×0.15, 5+ short ×0.05. A job far below your level (more than 2 years over its maximum) gets ×0.9. Set your years on My profile (a CV that says "fresh graduate" with no jobs listed reads as 0).
 - Always confirm in the original circular: this is read automatically.
 
 ### Automatic sources (web page: http://localhost:3000/sources)

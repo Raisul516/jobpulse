@@ -20,6 +20,7 @@ export type Requirements = {
   subjects?: string[]; // required subjects, e.g. ["CSE", "EEE"]
   minCgpa?: number; // on a 4.00 scale
   minExperienceYears?: number;
+  maxExperienceYears?: number; // "1 to 2 years" -> min 1, max 2
   freshersWelcome?: boolean;
 };
 
@@ -32,11 +33,49 @@ const toAsciiDigits = (s: string) => s.replace(BANGLA_DIGITS, (d) => String(d.ch
 // Sentences that talk about something nice-to-have, not mandatory
 const PREFERRED = /\b(preferred|preferable|is a plus|will be a plus|an advantage|added advantage|desirable|nice to have|bonus)\b/i;
 
+// A line that is only a heading: bdjobs writes "Experience" and on the NEXT line "At least 5 years".
+const HEADING_ONLY = /^(?:(?:required\s+|work\s+|job\s+)?experience(?:\s+requirements?)?|অভিজ্ঞতা)\s*:?$/i;
+
 function sentences(text: string): string[] {
-  return text
+  const lines = text.split(/\n+/);
+  const joined: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (HEADING_ONLY.test(line) && i + 1 < lines.length) {
+      joined.push(`${line.replace(/\s*:$/, "")}: ${lines[++i].trim()}`); // "Experience: At least 5 years"
+    } else {
+      joined.push(line);
+    }
+  }
+  return joined
+    .join("\n")
     .split(/(?<=[.!?।])\s+|\n+|•|·/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+const NUM = String.raw`(\d{1,2}(?:\.\d)?)`;
+const YEARS = String.raw`(?:years?|yrs?|বছর(?:ের)?)`;
+const MONTHS = String.raw`(?:months?|মাস(?:ের)?)`;
+const RANGE = new RegExp(String.raw`${NUM}\s*(?:-|–|to|থেকে)\s*${NUM}\s*${YEARS}`, "i");
+const AT_LEAST = new RegExp(String.raw`(?:at\s+least|minimum(?:\s+of)?|min\.?|over|more\s+than|ন্যূনতম|কমপক্ষে)\s*${NUM}\s*\+?\s*${YEARS}`, "i");
+const PLUS = new RegExp(String.raw`${NUM}\s*\+\s*${YEARS}|${NUM}\s*${YEARS}\s*(?:or\s+more|and\s+above|plus)`, "i");
+const PLAIN = new RegExp(String.raw`${NUM}\s*${YEARS}`, "i");
+const IN_MONTHS = new RegExp(String.raw`${NUM}\s*${MONTHS}`, "i");
+
+// Years of experience in one sentence that talks about experience:
+// "At least 5 years", "2+ years", "1 to 2 years", "0-2 yrs", "৩ বছরের অভিজ্ঞতা", "6 months".
+export function parseExperience(sentence: string): { min: number; max?: number } | null {
+  let m = sentence.match(RANGE);
+  if (m) {
+    const [min, max] = [Number(m[1]), Number(m[2])];
+    return min <= max ? { min, max } : null;
+  }
+  m = sentence.match(AT_LEAST) ?? sentence.match(PLUS) ?? sentence.match(PLAIN);
+  if (m) return { min: Number(m[1] ?? m[2]) };
+  m = sentence.match(IN_MONTHS);
+  if (m) return { min: Math.round((Number(m[1]) / 12) * 10) / 10 };
+  return null;
 }
 
 // Subject names people write, mapped to one short code
@@ -111,21 +150,22 @@ export function extractRequirements(rawText: string): Requirements {
     }
 
     // ----- experience -----
-    if (/\bexperience|অভিজ্ঞতা/i.test(sentence) && !preferred) {
+    // (not in a sentence about age: "Age: at least 24 years")
+    if (/\bexperience|অভিজ্ঞতা/i.test(sentence) && !preferred && !/\b(age|aged)\b|বয়স/i.test(sentence)) {
       if (/\b(fresh(?:er|ers)?|fresh graduates?|no experience (?:is )?(?:required|needed))\b/i.test(sentence)) {
         req.freshersWelcome = true;
       }
-      const m =
-        sentence.match(/(?:at\s+least|minimum(?:\s+of)?|min\.?|over|more\s+than)\s*(\d{1,2})\+?\s*(?:years?|yrs?)/i) ??
-        sentence.match(/(\d{1,2})\s*(?:-|–|to)\s*\d{1,2}\s*(?:years?|yrs?)/i) ??
-        sentence.match(/(\d{1,2})\+?\s*(?:years?|yrs?)(?:\s+of)?(?:\s+\w+){0,3}\s+experience/i);
-      if (m) {
-        const years = Number(m[1]);
-        if (years <= 40) req.minExperienceYears = Math.max(req.minExperienceYears ?? 0, years);
+      const exp = parseExperience(sentence);
+      // several statements: keep the strictest minimum (and its range)
+      if (exp && exp.min <= 40 && (req.minExperienceYears === undefined || exp.min > req.minExperienceYears)) {
+        req.minExperienceYears = exp.min;
+        if (exp.max !== undefined) req.maxExperienceYears = exp.max;
+        else delete req.maxExperienceYears;
       }
     }
-    if (/\bfresh(?:er|ers)?\b|fresh graduates?/i.test(sentence) && /\b(apply|welcome|encouraged|eligible)\b/i.test(sentence)) {
-      req.freshersWelcome = true;
+    // "Fresh graduates may apply: Yes" (bdjobs) or "freshers are encouraged to apply", but not "...: No"
+    if (/\bfresh(?:er|ers)?\b|fresh graduates?|ফ্রেশার/i.test(sentence) && /\b(apply|welcome|encouraged|eligible)\b|আবেদন/i.test(sentence)) {
+      if (!/:\s*(?:no|false|0)\s*$/i.test(sentence)) req.freshersWelcome = true;
     }
 
     // ----- education level + subject -----
@@ -156,7 +196,10 @@ export function extractRequirements(rawText: string): Requirements {
   }
 
   // "Fresh graduates may apply" means no experience is required, whatever else is written
-  if (req.freshersWelcome) delete req.minExperienceYears;
+  if (req.freshersWelcome) {
+    delete req.minExperienceYears;
+    delete req.maxExperienceYears;
+  }
   return req;
 }
 
@@ -282,7 +325,10 @@ export function checkEligibility(
 
   // ----- experience -----
   if (req.minExperienceYears !== undefined && req.minExperienceYears > 0) {
-    const label = `${req.minExperienceYears}+ years experience`;
+    const label =
+      req.maxExperienceYears !== undefined
+        ? `${req.minExperienceYears}–${req.maxExperienceYears} years experience`
+        : `${req.minExperienceYears}+ years experience`;
     if (profile.experienceYears === null) {
       checks.push({ requirement: label, status: "unknown", reason: "Add your years of experience on My profile" });
     } else {

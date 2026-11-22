@@ -30,17 +30,25 @@ export async function addMatches<T extends ScorableJob>(userId: number, jobs: T[
   const withMatch = jobs.map((job) => {
     let match: MatchResult | null = null;
     if (prefs) {
-      const cv = profile
-        ? {
-            skills: profile.skills,
-            similarity: similarity.get(job.id) ?? null,
-            // the job's mandatory requirements, checked against your confirmed profile
-            eligibility: checkEligibility(extractRequirements(`${job.title}\n${job.description ?? ""}`), profile, {
-              deadline: job.deadline,
-              isGovernment: job.category === "Government",
-            }),
-          }
-        : undefined;
+      const req = profile ? extractRequirements(`${job.title}\n${job.description ?? ""}`) : null;
+      const cv =
+        profile && req
+          ? {
+              skills: profile.skills,
+              similarity: similarity.get(job.id) ?? null,
+              // the job's mandatory requirements, checked against your confirmed profile
+              eligibility: checkEligibility(req, profile, {
+                deadline: job.deadline,
+                isGovernment: job.category === "Government",
+              }),
+              experience: {
+                min: req.minExperienceYears,
+                max: req.maxExperienceYears,
+                freshersWelcome: req.freshersWelcome,
+                yours: profile.experienceYears,
+              },
+            }
+          : undefined;
       match = matchJob(job, prefs, cv);
     }
     return { ...job, match };

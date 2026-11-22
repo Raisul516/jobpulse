@@ -194,3 +194,14 @@ def test_rejects_other_file_types():
 def test_rejects_broken_pdf():
     with pytest.raises(CvReadError):
         extract_text("cv.pdf", b"%PDF-1.4 this is not really a pdf")
+
+
+def test_fresh_graduate_means_zero_years():
+    from app.cv_parser import find_experience_years
+
+    assert find_experience_years("Fresh CSE graduate looking for backend roles.", [])[0] == 0.0
+    assert find_experience_years("I am a fresher in web development.", [])[0] == 0.0
+    assert find_experience_years("Recently graduated from BRAC University.", [])[0] == 0.0
+    # jobs listed: they win; nothing said: unknown
+    assert find_experience_years("Fresh graduate", ["Intern, ABC Ltd, Jan 2024 - Jul 2024"])[0] == 0.5
+    assert find_experience_years("Backend developer.", [])[0] is None

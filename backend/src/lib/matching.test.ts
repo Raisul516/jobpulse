@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { containsKeyword, matchJob, MatchableJob, Preferences, similarityToScore } from "./matching";
+import { containsKeyword, experienceFactor, matchJob, MatchableJob, Preferences, similarityToScore } from "./matching";
 
 const job: MatchableJob = {
   title: "Junior React Developer",
@@ -146,5 +146,50 @@ describe("matchJob", () => {
 
   it("location filter ignores capital letters", () => {
     expect(matchJob(job, { ...prefs, locations: ["dhaka"] }).passesFilters).toBe(true);
+  });
+});
+
+describe("experience in the score", () => {
+  // keywords that fully match the title -> base score 100
+  const keyPrefs: Preferences = { ...prefs, keywords: ["react"] };
+  const score = (min: number | undefined, yours: number | null, extra: { max?: number; freshersWelcome?: boolean } = {}) =>
+    matchJob(job, keyPrefs, { skills: [], similarity: null, experience: { min, yours, ...extra } });
+
+  it("cuts the score harder the more years you are short", () => {
+    expect(score(undefined, 0).score).toBe(70); // job states nothing: no cut (one title keyword = 70)
+    expect(score(2, 3).score).toBe(70); // you meet it
+    expect(score(1, 0).score).toBe(42); // 1 year short: x0.6
+    expect(score(2, 0).score).toBe(25); // x0.35
+    expect(score(4, 0).score).toBe(11); // x0.15
+    expect(score(5, 0).score).toBe(4); // x0.05
+  });
+
+  it("0-2 years and fresher jobs are fine for a beginner", () => {
+    const r = score(0, 0, { max: 2 });
+    expect(r.score).toBe(70);
+    expect(r.reasons).toContainEqual({ text: "Experience: 0–2 years (fits beginners)", good: true });
+    expect(score(undefined, 0, { freshersWelcome: true }).reasons).toContainEqual({ text: "Fresh graduates can apply", good: true });
+  });
+
+  it("explains the cut", () => {
+    expect(score(5, 0).reasons).toContainEqual({ text: "Needs 5 years+ experience, you have 0 years — score cut by 95%", good: false });
+    expect(score(1, 0, { max: 2 }).reasons).toContainEqual({
+      text: "Needs 1–2 years experience, you have 0 years — score cut by 40%",
+      good: false,
+    });
+  });
+
+  it("unknown own experience: no cut, but asks you to add it", () => {
+    const r = score(3, null);
+    expect(r.score).toBe(70);
+    expect(r.reasons).toContainEqual({ text: "Needs 3 years+ experience — add yours on My profile to score it", good: false });
+  });
+
+  it("slightly lowers jobs far below your level", () => {
+    expect(score(0, 6, { max: 2 }).score).toBe(63);
+  });
+
+  it("factor table", () => {
+    expect([0, 0.5, 1, 2, 3, 4, 5, 10].map(experienceFactor)).toEqual([1, 0.6, 0.6, 0.35, 0.15, 0.15, 0.05, 0.05]);
   });
 });

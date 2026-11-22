@@ -35,6 +35,7 @@ type Requirements = {
   subjects?: string[];
   minCgpa?: number;
   minExperienceYears?: number;
+  maxExperienceYears?: number;
   freshersWelcome?: boolean;
 };
 
@@ -49,7 +50,8 @@ function requirementLines(r: Requirements): string[] {
   }
   if (r.minEducation) lines.push(`${r.minEducation} degree${r.subjects?.length ? ` in ${r.subjects.join(" / ")}` : ""}`);
   if (r.minCgpa !== undefined) lines.push(`CGPA ${r.minCgpa.toFixed(2)} or more`);
-  if (r.minExperienceYears) lines.push(`${r.minExperienceYears}+ years of experience`);
+  if (r.maxExperienceYears !== undefined) lines.push(`${r.minExperienceYears ?? 0}–${r.maxExperienceYears} years of experience`);
+  else if (r.minExperienceYears) lines.push(`${r.minExperienceYears}+ years of experience`);
   if (r.freshersWelcome) lines.push("Fresh graduates may apply");
   return lines;
 }

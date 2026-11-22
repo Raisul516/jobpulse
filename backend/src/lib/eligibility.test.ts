@@ -116,3 +116,43 @@ describe("checkEligibility", () => {
     expect(checkEligibility({ maxAge: 30 }, { ...profile, dateOfBirth: null }, opts).checks[0].status).toBe("unknown");
   });
 });
+
+describe("experience in real-world formats", () => {
+  const exp = (text: string) => {
+    const r = extractRequirements(text);
+    return { min: r.minExperienceYears, max: r.maxExperienceYears, fresh: r.freshersWelcome };
+  };
+
+  it.each([
+    ["Experience\nAt least 5 years", 5, undefined],
+    ["Experience\n1 to 2 years\nThe applicants should have experience in IT", 1, 2],
+    ["Experience:\n4 to 7 years", 4, 7],
+    ["0-2 years of experience", 0, 2],
+    ["2+ years experience with React", 2, undefined],
+    ["Minimum 3 years of experience in Laravel.", 3, undefined],
+    ["Experience: 5 years or more", 5, undefined],
+    ["৩ বছরের অভিজ্ঞতা থাকতে হবে", 3, undefined],
+    ["অভিজ্ঞতা\nকমপক্ষে ২ বছর", 2, undefined],
+    ["6 months experience in customer service", 0.5, undefined],
+  ])("%j -> %s..%s years", (text, min, max) => {
+    expect(exp(text)).toEqual({ min, max, fresh: undefined });
+  });
+
+  it("keeps the strictest minimum", () => {
+    expect(exp("1 year experience in PHP.\nExperience\nAt least 3 years")).toMatchObject({ min: 3 });
+  });
+
+  it("does not read age as experience", () => {
+    expect(exp("Experience\nAt least 2 years\nAge: At least 24 years")).toMatchObject({ min: 2 });
+    expect(exp("Age at least 24 years. Work experience is a must.")).toMatchObject({ min: undefined });
+  });
+
+  it("ignores nice-to-have experience", () => {
+    expect(exp("5 years experience is preferred.")).toMatchObject({ min: undefined });
+  });
+
+  it("bdjobs 'Fresh graduates may apply' Yes / No", () => {
+    expect(exp("Experience\n0 to 2 years\n\nFresh graduates may apply: Yes")).toEqual({ min: undefined, max: undefined, fresh: true });
+    expect(exp("Experience\n3 years\n\nFresh graduates may apply: No")).toEqual({ min: 3, max: undefined, fresh: undefined });
+  });
+});

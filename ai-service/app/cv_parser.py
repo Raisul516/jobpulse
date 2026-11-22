@@ -311,6 +311,9 @@ def find_experience_years(text: str, experience_lines: list[str], today: date | 
             months += span
     if months:
         return round(months / 12, 1), "text"
+    # "Fresh CSE graduate", "fresher", "recent graduate" and no jobs listed -> 0 years
+    if not experience_lines and re.search(r"\b(fresh(?:er|\s+\w*\s*graduate)|recent(?:ly)?\s+graduate[ds]?|no\s+(?:work\s+)?experience)\b", text, re.I):
+        return 0.0, "text"
     return None, "text"
 
 

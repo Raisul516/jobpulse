@@ -58,7 +58,54 @@ export type CvSignals = {
   skills: string[];
   similarity: number | null; // cosine similarity between your profile and this job, or null if not computed yet
   eligibility?: Eligibility; // mandatory requirements checked against your profile
+  experience?: ExperienceSignal;
 };
+
+// What the job asks (read from its text) and what you have (My profile).
+export type ExperienceSignal = {
+  min?: number;
+  max?: number;
+  freshersWelcome?: boolean;
+  yours: number | null;
+};
+
+// Experience is a big factor: being short of the required years cuts the whole score.
+//   meets it -> no cut · 1 year short -> score x0.6 · 2 short -> x0.35 · 3-4 short -> x0.15 · 5+ short -> x0.05
+export function experienceFactor(gapYears: number): number {
+  if (gapYears <= 0) return 1;
+  if (gapYears <= 1) return 0.6;
+  if (gapYears <= 2) return 0.35;
+  if (gapYears <= 4) return 0.15;
+  return 0.05;
+}
+
+const years = (n: number) => `${n} year${n === 1 ? "" : "s"}`;
+
+function experienceFit(e: ExperienceSignal | undefined): { factor: number; reason?: { text: string; good: boolean } } {
+  if (!e) return { factor: 1 };
+  if (e.max !== undefined && e.yours !== null && e.yours > e.max + 2) {
+    const asked = `${e.min ?? 0}–${years(e.max)}`;
+    return { factor: 0.9, reason: { text: `Asks ${asked} experience — you may be over-qualified`, good: false } };
+  }
+  if (e.min === undefined || e.min <= 0) {
+    if (e.freshersWelcome) return { factor: 1, reason: { text: "Fresh graduates can apply", good: true } };
+    if (e.max !== undefined) return { factor: 1, reason: { text: `Experience: 0–${years(e.max)} (fits beginners)`, good: true } };
+    return { factor: 1 };
+  }
+  const asked = e.max !== undefined ? `${e.min}–${years(e.max)}` : `${years(e.min)}+`;
+  if (e.yours === null) {
+    return { factor: 1, reason: { text: `Needs ${asked} experience — add yours on My profile to score it`, good: false } };
+  }
+  const gap = e.min - e.yours;
+  if (gap > 0) {
+    const factor = experienceFactor(gap);
+    return {
+      factor,
+      reason: { text: `Needs ${asked} experience, you have ${years(e.yours)} — score cut by ${Math.round((1 - factor) * 100)}%`, good: false },
+    };
+  }
+  return { factor: 1, reason: { text: `Experience fits: needs ${asked}, you have ${years(e.yours)}`, good: true } };
+}
 
 export function matchJob(job: MatchableJob, prefs: Preferences, cv?: CvSignals): MatchResult {
   const reasons: MatchResult["reasons"] = [];
@@ -137,7 +184,12 @@ export function matchJob(job: MatchableJob, prefs: Preferences, cv?: CvSignals):
 
   // Nothing to score by (no keywords, no CV): everything that passes your filters counts.
   const totalWeight = parts.reduce((sum, p) => sum + p.weight, 0);
-  const score = totalWeight ? roundHalfUp(parts.reduce((sum, p) => sum + p.score * p.weight, 0) / totalWeight) : 100;
+  const baseScore = totalWeight ? parts.reduce((sum, p) => sum + p.score * p.weight, 0) / totalWeight : 100;
+
+  // d) experience: not one more part of the average, but a cut of the whole score when you're short
+  const experience = experienceFit(cv?.experience);
+  if (experience.reason) reasons.push(experience.reason);
+  const score = roundHalfUp(baseScore * experience.factor);
 
   // Eligibility is NOT part of the score: a clear "fail" blocks the match whatever the score.
   // ("unknown" doesn't block — it's shown so you can check yourself.)
