@@ -1,0 +1,13 @@
+{
+  "name": "jobpulse-e2e",
+  "private": true,
+  "description": "End-to-end tests: a real browser clicks through JobPulse (separate test database).",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "pg": "^8.23.1"
+  }
+}

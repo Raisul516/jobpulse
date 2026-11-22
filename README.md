@@ -73,6 +73,19 @@ JobPulse uses RAG (Retrieval-Augmented Generation): the backend **finds** the ri
 - Max 20 AI answers per 10 minutes, to stay inside free limits.
 - Privacy: the question, the job texts and your CV profile (skills, education, experience, summary — not your name or date of birth) are sent to the LLM provider. Free tiers may use data to improve their models.
 
+## End-to-end tests (real browser)
+
+`e2e/` uses Playwright: it creates a **separate** database `jobpulse_e2e` (your real data is never touched), starts a test backend on port 4100 and a production build of the website on 3100, then Chromium creates an account, filters and saves jobs, checks the AI pages fail politely without an AI service, and logs out and in.
+
+```
+cd e2e
+npm install
+npx playwright install chromium   # first time only
+npm test                          # needs the Docker database running
+```
+
+The same tests run on GitHub CI (job "End-to-end").
+
 ## Useful backend commands
 
 | Command | Does |

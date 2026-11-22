@@ -74,10 +74,15 @@ function AuthForm({ mode, onDone }: { mode: "setup" | "login"; onDone: () => voi
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete={mode === "setup" ? "new-password" : "current-password"}
+            aria-describedby={mode === "setup" ? "password-hint" : undefined}
             className="input"
           />
-          {mode === "setup" ? <span className="hint">At least {MIN_PASSWORD} characters.</span> : null}
         </label>
+        {mode === "setup" ? (
+          <p id="password-hint" className="hint -mt-3">
+            At least {MIN_PASSWORD} characters.
+          </p>
+        ) : null}
         {mode === "setup" ? (
           <label className="block">
             <span className="label">Repeat password</span>
