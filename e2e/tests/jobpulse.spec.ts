@@ -63,6 +63,10 @@ test("open a job, AI explanation fails politely, save it", async () => {
   await page.getByRole("button", { name: "Explain with AI" }).click();
   await expect(page.getByText("The AI service is not running")).toBeVisible();
 
+  await page.getByLabel("Language").selectOption("bn");
+  await page.getByRole("button", { name: "Write cover letter" }).click();
+  await expect(page.getByText("The AI service is not running")).toHaveCount(2);
+
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("button", { name: "Saved", exact: true })).toBeVisible();
 });

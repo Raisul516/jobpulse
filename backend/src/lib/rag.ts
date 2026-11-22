@@ -3,7 +3,7 @@
 //   Generation: give only those facts to the LLM (in the ai-service) and let it write the answer.
 // The LLM never sees the whole database, and it may only recommend jobs we sent it.
 import { createHash } from "node:crypto";
-import { askAboutJobs, AiServiceError, embedTexts, explainMatch, LlmProfile } from "./aiService";
+import { askAboutJobs, AiServiceError, CoverLetterOptions, coverLetter, embedTexts, explainMatch, LlmProfile } from "./aiService";
 import { findJobById, findJobsBySimilarity } from "./jobQueries";
 import { addMatches } from "./matchForUser";
 import { getProfile, getProfileForMatching } from "./profile";
@@ -114,4 +114,15 @@ export async function askJobPulse(userId: number, question: string) {
   const recommended = result.jobIds.map((id) => byId.get(id)!).filter(Boolean);
   const others = jobs.filter((j) => !result.jobIds.includes(j.id));
   return { answer: result.answer, model: result.model, recommended, jobs: [...recommended, ...others] };
+}
+
+// ---------- 3. Cover letter for one job ----------
+// Your name is NOT sent: the LLM signs with a placeholder and the website fills in your name.
+
+export async function writeCoverLetter(userId: number, jobId: number, options: CoverLetterOptions) {
+  const job = await findJobById(jobId, userId);
+  if (!job) return null;
+  const profile = await profileForLlm(userId);
+  takeLlmCall();
+  return coverLetter(jobFacts(job), profile, options);
 }

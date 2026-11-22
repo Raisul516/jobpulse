@@ -68,6 +68,7 @@ JobPulse uses RAG (Retrieval-Augmented Generation): the backend **finds** the ri
 
 - **Ask JobPulse** (http://localhost:3000/ask): ask in English, Bangla or Banglish, e.g. "Dhakay fresher der jonno kon software job ache?". Recommended jobs are shown under the answer.
 - **Explain with AI** on every job page: what in your CV matches, what's missing, and a tip for applying (cached, so asking again costs nothing).
+- **Cover letter** on every job page: English or Bangla (government jobs get the আবেদনপত্র format), formal or friendly, plus your own notes. Edit it, then Copy or Download .txt. Your name is not sent to the AI: it signs with `[Your Name]` and the browser fills in the name from My profile.
 - Setup: get a free key at https://aistudio.google.com/apikey, copy `ai-service/.env.example` to `ai-service/.env` and set `LLM_API_KEY`, then restart the AI service. Without a key everything else still works; these two features say they are off.
 - Any OpenAI-compatible provider works (`LLM_BASE_URL`, `LLM_MODEL`), e.g. Groq.
 - Max 20 AI answers per 10 minutes, to stay inside free limits.
@@ -110,6 +111,7 @@ The same tests run on GitHub CI (job "End-to-end").
 
 - `POST /api/ai/ask` `{ question }` → `{ answer, model, recommended, jobs }`
 - `POST /api/ai/explain/:jobId` → `{ text, model, cached }`
+- `POST /api/ai/cover-letter/:jobId` `{ language: "en"|"bn", tone: "formal"|"friendly", notes }` → `{ text, model, namePlaceholder }`
 
 ### CV profile (web page: http://localhost:3000/profile)
 

@@ -90,3 +90,13 @@ export function askAboutJobs(
 function jsonPost(body: unknown): RequestInit {
   return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
 }
+
+export type CoverLetterOptions = { language: "en" | "bn"; tone: "formal" | "friendly"; notes: string };
+
+export function coverLetter(
+  job: object,
+  profile: LlmProfile,
+  options: CoverLetterOptions
+): Promise<{ text: string; model: string; namePlaceholder: string }> {
+  return call("/cover-letter", jsonPost({ job, profile, ...options }), 90_000);
+}

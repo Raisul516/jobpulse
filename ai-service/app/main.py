@@ -7,6 +7,7 @@ Only the Node backend calls this (never the browser directly), and it only liste
   POST /embed      {"texts": [...]} -> one 384-number vector per text
   POST /explain-match {job, profile, match} -> {text}           (needs LLM_API_KEY)
   POST /ask           {question, jobs, profile} -> {answer, jobIds} (needs LLM_API_KEY)
+  POST /cover-letter  {job, profile, language, tone, notes} -> {text} (needs LLM_API_KEY)
 """
 
 import hmac
@@ -101,5 +102,21 @@ class AskRequest(BaseModel):
 def ask_endpoint(body: AskRequest):
     try:
         return llm.answer_question(body.question, body.jobs, body.profile)
+    except llm.LlmError as err:
+        raise HTTPException(status_code=err.status, detail=str(err)) from err
+
+
+class CoverLetterRequest(BaseModel):
+    job: dict
+    profile: dict | None = None
+    language: str = Field(default="en", pattern="^(en|bn)$")
+    tone: str = Field(default="formal", pattern="^(formal|friendly)$")
+    notes: str = Field(default="", max_length=800)
+
+
+@app.post("/cover-letter")
+def cover_letter_endpoint(body: CoverLetterRequest):
+    try:
+        return llm.cover_letter(body.job, body.profile, body.language, body.tone, body.notes)
     except llm.LlmError as err:
         raise HTTPException(status_code=err.status, detail=str(err)) from err

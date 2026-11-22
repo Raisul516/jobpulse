@@ -20,6 +20,7 @@ import {
 import Link from "next/link";
 import { Suspense, use, useEffect, useState } from "react";
 import AiExplain from "../../components/AiExplain";
+import CoverLetter from "../../components/CoverLetter";
 import DeadlineBadge from "../../components/DeadlineBadge";
 import { formatSalary } from "../../components/JobCard";
 import { api } from "../../lib/api";
@@ -227,6 +228,7 @@ function JobDetail({ params }: { params: Promise<{ id: string }> }) {
 
       {/* ----- AI explanation (RAG) ----- */}
       <AiExplain jobId={job.id} />
+      <CoverLetter jobId={job.id} jobTitle={job.title} company={job.company} />
 
       {/* ----- requirements as read ----- */}
       {reqLines.length ? (

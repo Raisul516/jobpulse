@@ -85,3 +85,25 @@ def test_busy_model_falls_back(monkeypatch):
     r = client.post("/explain-match", json={"job": {"title": "Dev"}})
     assert r.status_code == 200 and r.json() == {"text": "Fit: ok", "model": "backup-model"}
     assert tried == [llm.DEFAULT_MODEL, "backup-model"]
+
+
+def test_cover_letter_prompt(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "k")
+    seen = {}
+    monkeypatch.setattr(httpx, "post", fake_post(content="Dear Sir,\n...\n[Your Name]", seen=seen))
+    r = client.post(
+        "/cover-letter",
+        json={"job": {"title": "Assistant Programmer", "category": "Government"},
+              "profile": {"skills": ["Python"]}, "language": "bn", "tone": "formal", "notes": "Internship at X"},
+    )
+    assert r.status_code == 200
+    assert r.json()["namePlaceholder"] == "[Your Name]"
+    prompt = seen["body"]["messages"][1]["content"]
+    assert "Internship at X" in prompt and "বরাবর" in prompt and "Python" in prompt
+    assert "Never invent" in seen["body"]["messages"][0]["content"]
+
+
+def test_cover_letter_rejects_bad_options(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "k")
+    assert client.post("/cover-letter", json={"job": {}, "language": "fr"}).status_code == 422
+    assert client.post("/cover-letter", json={"job": {}, "notes": "x" * 801}).status_code == 422

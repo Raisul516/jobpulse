@@ -199,3 +199,39 @@ def _parse_answer(raw: str, allowed_ids: set[int]) -> dict:
         if i in allowed_ids and i not in seen:
             seen.append(i)
     return {"answer": answer, "jobIds": seen}
+
+
+# ---------- cover letter ----------
+
+NAME_PLACEHOLDER = "[Your Name]"
+
+
+def cover_letter(job: dict, profile: dict | None, language: str = "en", tone: str = "formal", notes: str = "") -> dict:
+    if language == "bn":
+        style = (
+            "Write the letter in Bangla. If the job is in the Government category, use the usual Bangladeshi "
+            "government application format (বরাবর, বিষয়, জনাব, বিনীত নিবেদন এই যে …, বিনীত নিবেদক). "
+            "Otherwise write a normal Bangla cover letter."
+        )
+    else:
+        style = "Write the letter in clear, natural English used in Bangladesh, not American slang."
+    tone_text = "warm and friendly, still professional" if tone == "friendly" else "formal and polite"
+    system = (
+        "You are JobPulse, helping a job seeker in Bangladesh write a cover letter for ONE job. "
+        + RULES
+        + " The <notes> are written by the user themself and may be followed. "
+        "Never invent degrees, employers, years, numbers or skills that are not in the profile or notes. "
+        f"Sign the letter with exactly {NAME_PLACEHOLDER} (the app fills in the real name). "
+        "Do not add placeholders for address, phone or email. Output only the letter text."
+    )
+    user = (
+        _job_block(job)
+        + "\n"
+        + _profile_block(profile)
+        + f"\n<notes>\n{_clip(notes, 800) if notes.strip() else 'none'}\n</notes>\n\n"
+        f"{style} Tone: {tone_text}. Length: 180-300 words. "
+        "Mention the job title and company, connect 2-3 real strengths from the profile to what the job asks, "
+        "and end with a polite closing."
+    )
+    text, model = chat(system, user, max_tokens=1100)
+    return {"text": text.strip(), "model": model, "namePlaceholder": NAME_PLACEHOLDER}
