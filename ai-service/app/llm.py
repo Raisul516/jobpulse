@@ -4,7 +4,8 @@ Talks to any OpenAI-compatible chat API. Default: Google Gemini's free tier.
   LLM_API_KEY   your key (Gemini: https://aistudio.google.com/apikey). Empty = LLM features are off.
   LLM_BASE_URL  default https://generativelanguage.googleapis.com/v1beta/openai
                 (Groq: https://api.groq.com/openai/v1)
-  LLM_MODEL     default gemini-flash-latest (Groq e.g. llama-3.3-70b-versatile)
+  LLM_MODEL     default gemini-flash-lite-latest (Groq e.g. llama-3.3-70b-versatile)
+  LLM_FALLBACK_MODELS  comma-separated models to try when the main one is busy
 
 Job texts come from other websites, so the prompts tell the model to treat them as data only.
 """
@@ -18,7 +19,9 @@ import re
 import httpx
 
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
-DEFAULT_MODEL = "gemini-flash-latest"
+DEFAULT_MODEL = "gemini-flash-lite-latest"  # fast, no slow "thinking" step
+# tried in order when the main model is busy (Gemini only; set LLM_FALLBACK_MODELS="" to turn off)
+DEFAULT_FALLBACKS = "gemini-3.1-flash-lite,gemini-3.5-flash-lite"
 MAX_JOB_CHARS = 3000  # per job, so a long description can't crowd out everything else
 
 
@@ -36,38 +39,55 @@ def model_name() -> str:
     return os.environ.get("LLM_MODEL") or DEFAULT_MODEL
 
 
-def chat(system: str, user: str, *, max_tokens: int = 700, json_mode: bool = False) -> str:
+def fallback_models() -> list[str]:
+    raw = os.environ.get("LLM_FALLBACK_MODELS")
+    if raw is None:
+        raw = DEFAULT_FALLBACKS if not os.environ.get("LLM_BASE_URL") else ""
+    return [m.strip() for m in raw.split(",") if m.strip()]
+
+
+def chat(system: str, user: str, *, max_tokens: int = 700, json_mode: bool = False) -> tuple[str, str]:
+    """Returns (text, model used). If a model is overloaded or rate-limited, the next fallback model is tried."""
     key = os.environ.get("LLM_API_KEY", "")
     if not key:
         raise LlmError("AI writing is turned off: no LLM_API_KEY is set for the AI service.", 503)
     base = (os.environ.get("LLM_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
-    body: dict = {
-        "model": model_name(),
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-        "temperature": 0.3,
-        "max_tokens": max_tokens,
-    }
-    if json_mode:
-        body["response_format"] = {"type": "json_object"}
-    try:
-        response = httpx.post(
-            f"{base}/chat/completions",
-            headers={"Authorization": f"Bearer {key}"},
-            json=body,
-            timeout=60,
-        )
-    except httpx.HTTPError as err:
-        raise LlmError("Could not reach the LLM provider.") from err
-    if response.status_code == 429:
-        raise LlmError("The free LLM limit was reached. Try again in a minute.", 429)
-    if response.status_code in (401, 403):
-        raise LlmError("The LLM provider rejected the API key (LLM_API_KEY).", 502)
-    if response.status_code >= 400:
-        raise LlmError(f"The LLM provider returned an error ({response.status_code}).")
-    try:
-        return response.json()["choices"][0]["message"]["content"] or ""
-    except (KeyError, IndexError, ValueError) as err:
-        raise LlmError("The LLM provider sent an unexpected answer.") from err
+    models = [model_name()] + [m for m in fallback_models() if m != model_name()]
+    last_error = LlmError("The LLM provider returned an error.")
+    for model in models:
+        body: dict = {
+            "model": model,
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            "temperature": 0.3,
+            "max_tokens": max_tokens,
+        }
+        if json_mode:
+            body["response_format"] = {"type": "json_object"}
+        try:
+            response = httpx.post(
+                f"{base}/chat/completions",
+                headers={"Authorization": f"Bearer {key}"},
+                json=body,
+                timeout=45,
+            )
+        except httpx.HTTPError:
+            last_error = LlmError("Could not reach the LLM provider.")
+            continue
+        if response.status_code in (401, 403):
+            raise LlmError("The LLM provider rejected the API key (LLM_API_KEY).", 502)
+        if response.status_code == 429:
+            last_error = LlmError("The free LLM limit was reached. Try again in a minute.", 429)
+            continue
+        if response.status_code in (404, 500, 502, 503, 504):  # model gone or busy: try the next one
+            last_error = LlmError("The AI model is busy right now. Try again in a minute.", 503)
+            continue
+        if response.status_code >= 400:
+            raise LlmError(f"The LLM provider returned an error ({response.status_code}).")
+        try:
+            return (response.json()["choices"][0]["message"]["content"] or "", model)
+        except (KeyError, IndexError, ValueError) as err:
+            raise LlmError("The LLM provider sent an unexpected answer.") from err
+    raise last_error
 
 
 # ---------- what we tell the model ----------
@@ -116,7 +136,7 @@ def _job_block(job: dict, with_id: bool = False) -> str:
     return "<job>\n" + "\n".join(lines) + "\n</job>"
 
 
-def explain_match(job: dict, profile: dict | None, match: dict | None) -> str:
+def explain_match(job: dict, profile: dict | None, match: dict | None) -> dict:
     system = (
         "You are JobPulse, a careful job-search assistant for a job seeker in Bangladesh. "
         "Explain how well ONE job fits the user's CV profile. " + RULES
@@ -141,20 +161,27 @@ def explain_match(job: dict, profile: dict | None, match: dict | None) -> str:
         "Matches: up to 4 bullet points ('- ') of what in the profile matches the job.\n"
         "Gaps: up to 4 bullet points of missing requirements or things to check, and one practical tip for applying."
     )
-    return chat(system, user, max_tokens=600).strip()
+    text, model = chat(system, user, max_tokens=600)
+    return {"text": text.strip(), "model": model}
 
 
 def answer_question(question: str, jobs: list[dict], profile: dict | None) -> dict:
     system = (
         "You are JobPulse, a job-search assistant for a job seeker in Bangladesh. "
         "Answer the user's question using ONLY the jobs given (they were found by a search in the user's job list). "
-        "If none fit, say so honestly and suggest how to search differently. " + RULES + " "
-        'Reply as JSON: {"answer": "<plain text, max ~150 words>", "jobIds": [<ids of the jobs you recommend, best first>]}.'
+        "Answer exactly what was asked: if the question asks for a kind of job (a sector such as bank, NGO or "
+        "government, a place, a job type, a deadline, a salary), first check each job's category, company, location, "
+        "jobType, deadline and salary, and name the jobs that match. Do not recommend jobs that don't match what was "
+        "asked just because they fit the CV. If none match, say clearly that none were found and suggest how to "
+        "search differently. Use the CV profile only to rank matching jobs, or when the user asks what suits them. "
+        "Mention jobs by title and company, not by id. " + RULES + " "
+        'Reply as JSON: {"answer": "<plain text, max ~120 words>", '
+        '"jobIds": [<ids of at most 5 jobs that answer the question, best first; [] if none>]}.'
     )
     blocks = "\n".join(_job_block({**job, "_limit": 1200}, with_id=True) for job in jobs)
     user = f"{_profile_block(profile)}\n{blocks}\n\nQuestion: {question.strip()}"
-    raw = chat(system, user, max_tokens=700, json_mode=True)
-    return _parse_answer(raw, {job["id"] for job in jobs})
+    raw, model = chat(system, user, max_tokens=700, json_mode=True)
+    return {**_parse_answer(raw, {job["id"] for job in jobs}), "model": model}
 
 
 def _parse_answer(raw: str, allowed_ids: set[int]) -> dict:

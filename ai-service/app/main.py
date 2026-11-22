@@ -86,7 +86,7 @@ class ExplainRequest(BaseModel):
 @app.post("/explain-match")
 def explain_match_endpoint(body: ExplainRequest):
     try:
-        return {"text": llm.explain_match(body.job, body.profile, body.match), "model": llm.model_name()}
+        return llm.explain_match(body.job, body.profile, body.match)
     except llm.LlmError as err:
         raise HTTPException(status_code=err.status, detail=str(err)) from err
 
@@ -100,6 +100,6 @@ class AskRequest(BaseModel):
 @app.post("/ask")
 def ask_endpoint(body: AskRequest):
     try:
-        return {**llm.answer_question(body.question, body.jobs, body.profile), "model": llm.model_name()}
+        return llm.answer_question(body.question, body.jobs, body.profile)
     except llm.LlmError as err:
         raise HTTPException(status_code=err.status, detail=str(err)) from err

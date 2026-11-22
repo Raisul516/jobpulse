@@ -62,9 +62,26 @@ def test_ask_keeps_only_known_job_ids(monkeypatch):
     assert r.json()["answer"] == "Job 2 fits." and r.json()["jobIds"] == [2]
 
 
-@pytest.mark.parametrize("status,expected", [(429, 429), (401, 502), (500, 502)])
+@pytest.mark.parametrize("status,expected", [(429, 429), (401, 502), (500, 503), (503, 503), (400, 502)])
 def test_provider_errors(monkeypatch, status, expected):
     monkeypatch.setenv("LLM_API_KEY", "k")
     monkeypatch.setattr(httpx, "post", fake_post(status=status))
     r = client.post("/ask", json={"question": "hi there", "jobs": []})
     assert r.status_code == expected
+
+
+def test_busy_model_falls_back(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "k")
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.setenv("LLM_FALLBACK_MODELS", "backup-model")
+    tried = []
+
+    def post(url, headers, json, timeout):
+        tried.append(json["model"])
+        return FakeResponse(503 if len(tried) == 1 else 200, "Fit: ok")
+
+    monkeypatch.setattr(httpx, "post", post)
+    r = client.post("/explain-match", json={"job": {"title": "Dev"}})
+    assert r.status_code == 200 and r.json() == {"text": "Fit: ok", "model": "backup-model"}
+    assert tried == [llm.DEFAULT_MODEL, "backup-model"]
